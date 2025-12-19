@@ -135,8 +135,9 @@ public class LanceDatasetAdapter implements Closeable {
 
     /**
      * Reads batches from the dataset with given options.
+     * Applies optimizations from the optimization context if present.
      *
-     * @param options read options including predicate, columns, limit
+     * @param options read options including predicate, columns, limit, and optimization context
      * @return iterator of record batches
      * @throws LanceException if read fails
      */
@@ -145,16 +146,72 @@ public class LanceDatasetAdapter implements Closeable {
             LanceDataset dataset = openDataset();
             LOG.debug("Reading batches with options: {}", options);
             
-            // Get the table reader and apply options
-            org.apache.flink.connector.lance.sdk.LanceTableReader reader = dataset.getReader();
+            // Extract read parameters from options
             java.util.Optional<String> whereClause = options.getWhereClause();
             java.util.Optional<java.util.List<String>> columns = 
                     options.getColumns().isEmpty() ? 
                     java.util.Optional.empty() : 
                     java.util.Optional.of(options.getColumns());
             java.util.Optional<Long> limit = options.getLimit();
+            java.util.Optional<Long> offset = options.getOffset();
             
-            // Read batches with predicate pushdown and column selection applied
+            // Apply optimizations from optimization context if present (using reflection to avoid circular dependency)
+            if (options.hasOptimizationContext()) {
+                java.util.Optional<Object> contextOpt = options.getOptimizationContext();
+                if (contextOpt.isPresent()) {
+                    Object context = contextOpt.get();
+                    
+                    try {
+                        // Use reflection to safely extract optimization data without circular dependency
+                        java.lang.reflect.Method hasPushdownPredicate = context.getClass()
+                                .getMethod("hasPushdownPredicate");
+                        java.lang.reflect.Method getPushdownPredicate = context.getClass()
+                                .getMethod("getPushdownPredicate");
+                        java.lang.reflect.Method hasColumnPruning = context.getClass()
+                                .getMethod("hasColumnPruning");
+                        java.lang.reflect.Method getProjectedColumns = context.getClass()
+                                .getMethod("getProjectedColumns");
+                        java.lang.reflect.Method hasTopNPushdown = context.getClass()
+                                .getMethod("hasTopNPushdown");
+                        java.lang.reflect.Method getTopNLimit = context.getClass()
+                                .getMethod("getTopNLimit");
+                        
+                        LOG.debug("Applying optimizations from context");
+                        
+                        // Apply optimized predicate if available
+                        if ((boolean) hasPushdownPredicate.invoke(context)) {
+                            java.util.Optional<?> optimizedPredicate = (java.util.Optional<?>) getPushdownPredicate.invoke(context);
+                            if (optimizedPredicate.isPresent()) {
+                                whereClause = java.util.Optional.of((String) optimizedPredicate.get());
+                                LOG.info("Applied optimized predicate: {}", whereClause.get());
+                            }
+                        }
+                        
+                        // Apply optimized column projection if available
+                        if ((boolean) hasColumnPruning.invoke(context)) {
+                            java.util.Set<?> projectedCols = (java.util.Set<?>) getProjectedColumns.invoke(context);
+                            columns = java.util.Optional.of(new java.util.ArrayList<>(projectedCols.stream()
+                                    .map(Object::toString)
+                                    .collect(java.util.stream.Collectors.toList())));
+                            LOG.info("Applied column pruning: {} columns selected", columns.get().size());
+                        }
+                        
+                        // Apply optimized Top-N limit if available
+                        if ((boolean) hasTopNPushdown.invoke(context)) {
+                            java.util.Optional<?> topNLimit = (java.util.Optional<?>) getTopNLimit.invoke(context);
+                            if (topNLimit.isPresent()) {
+                                limit = java.util.Optional.of(((Number) topNLimit.get()).longValue());
+                                LOG.info("Applied Top-N pushdown: LIMIT {}", limit.get());
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("Failed to apply optimizations from context", e);
+                    }
+                }
+            }
+            
+            // Read batches with optimized parameters
+            org.apache.flink.connector.lance.sdk.LanceTableReader reader = dataset.getReader();
             return reader.readBatches(whereClause, columns, limit);
         } catch (Exception e) {
             throw new LanceException("Failed to read batches", e);

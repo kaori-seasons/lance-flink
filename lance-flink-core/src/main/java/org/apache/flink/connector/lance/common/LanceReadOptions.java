@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Options for reading from Lance dataset.
@@ -33,12 +34,17 @@ public class LanceReadOptions implements Serializable {
     private final List<String> columns;
     private final Optional<Long> limit;
     private final Optional<Long> version;
+    private final Optional<Long> offset;
+    // 优化参数：通过 Object 避免循环依赖
+    private final Optional<Object> optimizationContext;
 
     private LanceReadOptions(Builder builder) {
         this.whereClause = Optional.ofNullable(builder.whereClause);
         this.columns = new ArrayList<>(builder.columns);
         this.limit = Optional.ofNullable(builder.limit);
         this.version = Optional.ofNullable(builder.version);
+        this.offset = Optional.ofNullable(builder.offset);
+        this.optimizationContext = Optional.ofNullable(builder.optimizationContext);
     }
 
     public Optional<String> getWhereClause() {
@@ -57,6 +63,30 @@ public class LanceReadOptions implements Serializable {
         return version;
     }
 
+    public Optional<Long> getOffset() {
+        return offset;
+    }
+
+    /**
+     * Gets the optimization context applied to this read operation.
+     * Returns the context as Object to avoid circular dependencies.
+     * Cast to LanceOptimizationContext when needed.
+     *
+     * @return optimization context if present, empty otherwise
+     */
+    public Optional<Object> getOptimizationContext() {
+        return optimizationContext;
+    }
+
+    /**
+     * Checks if optimization context is present.
+     *
+     * @return true if optimization context has been set
+     */
+    public boolean hasOptimizationContext() {
+        return optimizationContext.isPresent();
+    }
+
     /**
      * Builder for LanceReadOptions.
      */
@@ -65,6 +95,8 @@ public class LanceReadOptions implements Serializable {
         private List<String> columns = new ArrayList<>();
         private Long limit;
         private Long version;
+        private Long offset;
+        private Object optimizationContext;
 
         public Builder whereClause(String whereClause) {
             this.whereClause = whereClause;
@@ -86,6 +118,23 @@ public class LanceReadOptions implements Serializable {
             return this;
         }
 
+        public Builder offset(long offset) {
+            this.offset = offset;
+            return this;
+        }
+
+        /**
+         * Sets the optimization context for this read operation.
+         * Accepts Object type to avoid circular module dependencies.
+         *
+         * @param context the optimization context
+         * @return this builder
+         */
+        public Builder optimizationContext(Object context) {
+            this.optimizationContext = context;
+            return this;
+        }
+
         public LanceReadOptions build() {
             return new LanceReadOptions(this);
         }
@@ -97,7 +146,9 @@ public class LanceReadOptions implements Serializable {
                 "whereClause=" + whereClause +
                 ", columns=" + columns +
                 ", limit=" + limit +
+                ", offset=" + offset +
                 ", version=" + version +
+                ", hasOptimizationContext=" + optimizationContext.isPresent() +
                 '}';
     }
 }

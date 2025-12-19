@@ -22,6 +22,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.connector.lance.common.LanceConfig;
 import org.apache.flink.connector.lance.common.LanceException;
+import org.apache.flink.connector.lance.common.LanceWriteOptions;
 import org.apache.flink.connector.lance.dataset.LanceDatasetAdapter;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
@@ -211,9 +212,8 @@ public class LanceUpsertSinkFunction extends RichSinkFunction<Row> implements Ch
             pendingRecords.clear();
             pendingRecords.addAll(recordBuffer.values());
             
-            // Write to Lance dataset
-            // Note: Lance SDK upsert is TBD - for now using append
-            // In production, implement proper merge/upsert semantics
+            // Write to Lance dataset (uses APPEND mode by default)
+            // TODO: In future, implement true UPSERT semantics with primary key tracking
             adapter.writeBatches(pendingRecords);
             
             // Clear buffer after successful write

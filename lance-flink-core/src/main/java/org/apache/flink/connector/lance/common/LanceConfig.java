@@ -41,6 +41,7 @@ public class LanceConfig implements Serializable {
     public static final String ENABLE_COLUMN_PRUNING = "column.pruning.enabled";
     public static final String MAX_RETRIES = "max.retries";
     public static final String RETRY_WAIT_MILLIS = "retry.wait.millis";
+    public static final String PRIMARY_KEY_COLUMN = "primary.key";
 
     private final String datasetUri;
     private final String storageBackend;
@@ -53,6 +54,7 @@ public class LanceConfig implements Serializable {
     private final boolean enableColumnPruning;
     private final int maxRetries;
     private final long retryWaitMillis;
+    private final String primaryKeyColumn;
     private final Map<String, String> originalOptions;
 
     private LanceConfig(Builder builder) {
@@ -67,6 +69,7 @@ public class LanceConfig implements Serializable {
         this.enableColumnPruning = builder.enableColumnPruning;
         this.maxRetries = builder.maxRetries > 0 ? builder.maxRetries : 3;
         this.retryWaitMillis = builder.retryWaitMillis > 0 ? builder.retryWaitMillis : 1000L;
+        this.primaryKeyColumn = builder.primaryKeyColumn;
         this.originalOptions = new HashMap<>(builder.originalOptions);
     }
 
@@ -112,6 +115,9 @@ public class LanceConfig implements Serializable {
         }
         if (options.containsKey(ENABLE_COLUMN_PRUNING)) {
             builder.enableColumnPruning(Boolean.parseBoolean(options.get(ENABLE_COLUMN_PRUNING)));
+        }
+        if (options.containsKey(PRIMARY_KEY_COLUMN)) {
+            builder.primaryKeyColumn(options.get(PRIMARY_KEY_COLUMN));
         }
 
         builder.originalOptions(options);
@@ -178,6 +184,10 @@ public class LanceConfig implements Serializable {
         return retryWaitMillis;
     }
 
+    public String getPrimaryKeyColumn() {
+        return primaryKeyColumn;
+    }
+
     public Map<String, String> getOriginalOptions() {
         return new HashMap<>(originalOptions);
     }
@@ -197,6 +207,7 @@ public class LanceConfig implements Serializable {
         private boolean enableColumnPruning = true;
         private int maxRetries = -1;
         private long retryWaitMillis = -1;
+        private String primaryKeyColumn;
         private Map<String, String> originalOptions = new HashMap<>();
 
         public Builder(String datasetUri) {
@@ -250,6 +261,11 @@ public class LanceConfig implements Serializable {
 
         public Builder retryWaitMillis(long retryWaitMillis) {
             this.retryWaitMillis = retryWaitMillis;
+            return this;
+        }
+
+        public Builder primaryKeyColumn(String primaryKeyColumn) {
+            this.primaryKeyColumn = primaryKeyColumn;
             return this;
         }
 

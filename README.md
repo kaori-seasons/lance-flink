@@ -1,8 +1,5 @@
-# Lance-Flink Connector: Production-Ready Guide
+# Lance-Flink Connector
 
-**Version**: 0.1.0-SNAPSHOT  
-**Status**: ✅ Production Ready  
-**Last Updated**: December 2025
 
 ## Table of Contents
 
@@ -1190,16 +1187,3 @@ open target/site/apidocs/index.html
 mvn surefire-report:report
 ```
 
----
-
-## License
-
-Licensed under the Apache License, Version 2.0. See LICENSE file in the project root.
-
----
-
-**Status**: ✅ Production Ready  
-**Version**: 0.1.0-SNAPSHOT  
-**Supported Flink**: 1.17.1+  
-**Supported Lance**: 2.0.0-beta.3+  
-**Last Updated**: December 19, 2025

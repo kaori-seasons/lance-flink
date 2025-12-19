@@ -1,0 +1,10 @@
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/common/LanceException.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/sdk/LanceTableReader.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/dataset/LanceDatasetAdapter.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/common/LanceWriteOptions.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/common/LanceReadOptions.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/common/LanceConfig.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/sdk/MockLanceTableReader.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/sdk/LanceSDKTableReader.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/format/ArrowBatch.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-core/src/main/java/org/apache/flink/connector/lance/format/RecordBatchIterator.java

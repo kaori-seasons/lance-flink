@@ -1,0 +1,7 @@
+org/apache/flink/connector/lance/benchmark/LanceBenchmark.class
+org/apache/flink/connector/lance/benchmark/LanceBenchmark$PredicatePushdownBenchmark.class
+org/apache/flink/connector/lance/benchmark/LanceBenchmark$BatchReadBenchmark.class
+org/apache/flink/connector/lance/benchmark/LanceBenchmark$BatchWriteBenchmark.class
+org/apache/flink/connector/lance/benchmark/LanceBenchmark$BenchmarkResult.class
+org/apache/flink/connector/lance/source/LanceBoundedSourceFunctionTest.class
+org/apache/flink/connector/lance/sink/LanceAppendSinkFunctionTest.class

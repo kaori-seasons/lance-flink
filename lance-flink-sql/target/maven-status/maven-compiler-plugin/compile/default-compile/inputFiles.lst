@@ -1,0 +1,3 @@
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-sql/src/main/java/org/apache/flink/connector/lance/dialect/LanceSQLDialect.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-sql/src/main/java/org/apache/flink/connector/lance/ddl/LanceDDLOperations.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-sql/src/main/java/org/apache/flink/connector/lance/optimizer/LanceOptimizationRules.java

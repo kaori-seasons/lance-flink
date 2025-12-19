@@ -1,0 +1,3 @@
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-connector/src/test/java/org/apache/flink/connector/lance/sink/LanceAppendSinkFunctionTest.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-connector/src/test/java/org/apache/flink/connector/lance/source/LanceBoundedSourceFunctionTest.java
+/Users/windwheel/gitrepo/lance-spark/lance-flink/lance-flink-connector/src/test/java/org/apache/flink/connector/lance/benchmark/LanceBenchmark.java

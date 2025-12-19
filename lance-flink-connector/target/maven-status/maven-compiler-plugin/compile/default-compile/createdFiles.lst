@@ -1,0 +1,5 @@
+org/apache/flink/connector/lance/sink/LanceAppendSinkFunction$SinkMetrics.class
+org/apache/flink/connector/lance/source/BaseLanceSourceFunction.class
+org/apache/flink/connector/lance/source/LanceBoundedSourceFunction.class
+org/apache/flink/connector/lance/sink/LanceAppendSinkFunction.class
+org/apache/flink/connector/lance/source/LanceBoundedSourceFunction$FragmentSplit.class

@@ -24,13 +24,25 @@ import org.apache.flink.connector.lance.format.RecordBatchIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.ipc.LanceScanner;
+import org.lance.ipc.ScanOptions;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Schema;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Production-ready implementation of LanceTableReader using Lance Java SDK.
+ * Production-ready implementation of LanceTableReader using Lance Java SDK with direct API calls.
  * 
  * This implementation provides direct access to Lance datasets with support for:
  * - Predicate pushdown (WHERE clause filtering at storage level)
@@ -38,13 +50,14 @@ import java.util.Optional;
  * - Result limiting
  * - Fragment management
  * 
- * Requires Lance Java SDK dependency: org.lance:lance-java:0.4.0
+ * Uses direct API calls to Lance Java SDK (org.lance:lance-core:2.0.0-beta.3)
+ * NO reflection - compiled-time type safety via JNI bindings.
  */
 public class LanceSDKTableReader implements LanceTableReader {
     private static final Logger LOG = LoggerFactory.getLogger(LanceSDKTableReader.class);
 
-    private final Object lanceDataset;  // org.lance.Dataset instance
-    private final Object allocator;     // BufferAllocator instance
+    private final Dataset lanceDataset;  // Direct API reference
+    private final BufferAllocator allocator;  // Direct API reference
     private boolean closed = false;
 
     /**
@@ -53,13 +66,14 @@ public class LanceSDKTableReader implements LanceTableReader {
      * @param lanceDataset the underlying Lance dataset from Lance SDK
      * @param allocator buffer allocator for Arrow operations
      */
-    public LanceSDKTableReader(Object lanceDataset, Object allocator) {
+    public LanceSDKTableReader(Dataset lanceDataset, BufferAllocator allocator) {
         this.lanceDataset = lanceDataset;
         this.allocator = allocator;
     }
 
     /**
      * Creates a LanceSDKTableReader by opening a Lance dataset from the specified URI.
+     * Uses direct Lance Java SDK API calls (no reflection).
      *
      * @param datasetUri URI of the Lance dataset (local path or cloud storage)
      * @return LanceSDKTableReader instance
@@ -67,18 +81,14 @@ public class LanceSDKTableReader implements LanceTableReader {
      */
     public static LanceSDKTableReader open(String datasetUri) throws LanceException {
         try {
-            // Load Lance SDK classes dynamically
-            Class<?> rootAllocatorClass = Class.forName("org.apache.arrow.memory.RootAllocator");
-            Class<?> datasetClass = Class.forName("org.lance.Dataset");
+            // Direct API call - create allocator
+            BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
             
-            // Create allocator: new RootAllocator(Long.MAX_VALUE)
-            Object allocator = rootAllocatorClass.getConstructor(long.class).newInstance(Long.MAX_VALUE);
+            // Direct API call - open dataset
+            Dataset dataset = Dataset.open(datasetUri);
             
-            // Open dataset: Dataset.open(uri)
-            Object lanceDataset = datasetClass.getMethod("open", String.class)
-                    .invoke(null, datasetUri);
-            
-            return new LanceSDKTableReader(lanceDataset, allocator);
+            LOG.info("Successfully opened Lance dataset from: {}", datasetUri);
+            return new LanceSDKTableReader(dataset, allocator);
         } catch (Exception e) {
             throw new LanceException("Failed to open Lance dataset: " + datasetUri, e);
         }
@@ -97,37 +107,37 @@ public class LanceSDKTableReader implements LanceTableReader {
             LOG.debug("Reading batches from Lance SDK: where={}, columns={}, limit={}",
                     whereClause.orElse("none"), columns.map(List::size).orElse(-1), limit.orElse(-1L));
 
-            // Create scan options using reflection
-            Object scanBuilder = createScanBuilder();
+            // Direct API call - create ScanOptions builder
+            ScanOptions.Builder scanBuilder = new ScanOptions.Builder();
             
-            // Add filter (WHERE clause)
+            // Add filter (WHERE clause) - direct API
             if (whereClause.isPresent()) {
-                invokeMethod(scanBuilder, "setFilter", new Class[]{String.class}, new Object[]{whereClause.get()});
-                LOG.debug("Applied predicate pushdown: {}", whereClause.get());
+                scanBuilder.filter(whereClause.get());
+                LOG.info("Applied predicate pushdown: {}", whereClause.get());
             }
 
-            // Add column selection
+            // Add column selection - direct API
             if (columns.isPresent() && !columns.get().isEmpty()) {
-                invokeMethod(scanBuilder, "setColumns", new Class[]{List.class}, new Object[]{columns.get()});
-                LOG.debug("Selected {} columns", columns.get().size());
+                scanBuilder.columns(columns.get());
+                LOG.info("Selected {} columns", columns.get().size());
             }
 
-            // Add limit
+            // Add limit - direct API
             if (limit.isPresent()) {
-                invokeMethod(scanBuilder, "setLimit", new Class[]{long.class}, new Object[]{limit.get()});
-                LOG.debug("Applied limit: {}", limit.get());
+                scanBuilder.limit(limit.get());
+                LOG.info("Applied limit: {}", limit.get());
             }
 
-            // Build scan options
-            Object scanOptions = invokeMethod(scanBuilder, "build", new Class[]{}, new Object[]{});
+            // Build scan options - direct API
+            ScanOptions scanOptions = scanBuilder.build();
 
-            // Create scanner
-            Object scanner = invokeMethod(lanceDataset, "newScan", new Class[]{scanOptions.getClass()}, new Object[]{scanOptions});
+            // Create scanner - direct API call
+            LanceScanner scanner = LanceScanner.create(lanceDataset, scanOptions, allocator);
             
-            // Get Arrow reader
-            Object arrowReader = invokeMethod(scanner, "scanBatches", new Class[]{}, new Object[]{});
+            // Get arrow reader from scanner - direct API call (returns ArrowReader)
+            ArrowReader arrowReader = scanner.scanBatches();
 
-            return new SDKRecordBatchIterator(arrowReader, allocator);
+            return new SDKRecordBatchIterator(arrowReader, allocator, scanner);
         } catch (Exception e) {
             throw new LanceException("Failed to read batches from Lance dataset", e);
         }
@@ -140,7 +150,8 @@ public class LanceSDKTableReader implements LanceTableReader {
         }
 
         try {
-            Object schema = invokeMethod(lanceDataset, "getSchema", new Class[]{}, new Object[]{});
+            // Direct API call
+            Schema schema = lanceDataset.getSchema();
             return serializeSchema(schema);
         } catch (Exception e) {
             throw new LanceException("Failed to get schema from Lance dataset", e);
@@ -154,7 +165,8 @@ public class LanceSDKTableReader implements LanceTableReader {
         }
 
         try {
-            return (long) invokeMethod(lanceDataset, "countRows", new Class[]{}, new Object[]{});
+            // Direct API call
+            return lanceDataset.countRows();
         } catch (Exception e) {
             throw new LanceException("Failed to get row count from Lance dataset", e);
         }
@@ -167,15 +179,15 @@ public class LanceSDKTableReader implements LanceTableReader {
         }
 
         try {
-            @SuppressWarnings("unchecked")
-            List<Object> fragments = (List<Object>) invokeMethod(lanceDataset, "getFragments", new Class[]{}, new Object[]{});
+            // Direct API call
+            java.util.List<Fragment> fragments = lanceDataset.getFragments();
             
             List<Integer> fragmentIds = new ArrayList<>();
-            for (Object fragment : fragments) {
-                int id = (int) invokeMethod(fragment, "getId", new Class[]{}, new Object[]{});
-                fragmentIds.add(id);
+            for (Fragment fragment : fragments) {
+                // Direct API call
+                fragmentIds.add(fragment.getId());
             }
-            LOG.debug("Listed {} fragments", fragmentIds.size());
+            LOG.info("Listed {} fragments", fragmentIds.size());
             return fragmentIds;
         } catch (Exception e) {
             throw new LanceException("Failed to list fragments from Lance dataset", e);
@@ -189,7 +201,8 @@ public class LanceSDKTableReader implements LanceTableReader {
         }
 
         try {
-            return (long) invokeMethod(lanceDataset, "version", new Class[]{}, new Object[]{});
+            // Direct API call - Dataset.getVersion() returns Version object
+            return lanceDataset.getVersion().getId();
         } catch (Exception e) {
             throw new LanceException("Failed to get dataset version", e);
         }
@@ -200,7 +213,8 @@ public class LanceSDKTableReader implements LanceTableReader {
         LOG.debug("Closing LanceSDKTableReader");
         if (!closed && lanceDataset != null) {
             try {
-                invokeMethod(lanceDataset, "close", new Class[]{}, new Object[]{});
+                // Direct API call
+                lanceDataset.close();
             } catch (Exception e) {
                 LOG.warn("Error closing Lance dataset", e);
             }
@@ -209,35 +223,19 @@ public class LanceSDKTableReader implements LanceTableReader {
     }
 
     /**
-     * Creates a ScanOptions.Builder instance using reflection.
+     * Serializes Arrow schema to bytes using direct API calls.
      */
-    private Object createScanBuilder() throws Exception {
-        Class<?> builderClass = Class.forName("org.lance.ipc.ScanOptions$Builder");
-        return builderClass.getConstructor().newInstance();
-    }
-
-    /**
-     * Invokes a method using reflection.
-     */
-    private Object invokeMethod(Object obj, String methodName, Class<?>[] paramTypes, Object[] params) throws Exception {
-        return obj.getClass().getMethod(methodName, paramTypes).invoke(obj, params);
-    }
-
-    /**
-     * Serializes Arrow schema to bytes.
-     */
-    private byte[] serializeSchema(Object schema) {
+    private byte[] serializeSchema(Schema schema) {
         try {
-            // Invoke getFields() on schema
-            @SuppressWarnings("unchecked")
-            List<Object> fields = (List<Object>) invokeMethod(schema, "getFields", new Class[]{}, new Object[]{});
+            // Direct API call - get fields from schema
+            List<org.apache.arrow.vector.types.pojo.Field> fields = schema.getFields();
             
             java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(4096);
             buffer.putInt(fields.size());
 
-            for (Object field : fields) {
-                // Get field name
-                String name = (String) invokeMethod(field, "getName", new Class[]{}, new Object[]{});
+            for (org.apache.arrow.vector.types.pojo.Field field : fields) {
+                // Direct API call - get field name
+                String name = field.getName();
                 byte[] nameBytes = name.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 buffer.putInt(nameBytes.length);
                 buffer.put(nameBytes);
@@ -256,34 +254,32 @@ public class LanceSDKTableReader implements LanceTableReader {
 
     /**
      * Implementation of RecordBatchIterator using Lance Scanner's ArrowReader.
+     * Uses direct API calls with compiled-time type safety.
      */
     private static class SDKRecordBatchIterator implements RecordBatchIterator {
-        private final Object arrowReader;
-        private final Object allocator;
+        private final ArrowReader arrowReader;
+        private final BufferAllocator allocator;
+        private final LanceScanner scanner;
         private int currentBatchIndex = 0;
         private long totalRowCount = 0;
-        private boolean hasNextBatch = false;
+        private VectorSchemaRoot currentRoot = null;
         private boolean closed = false;
 
-        SDKRecordBatchIterator(Object arrowReader, Object allocator) throws Exception {
+        SDKRecordBatchIterator(ArrowReader arrowReader, BufferAllocator allocator, LanceScanner scanner) throws Exception {
             this.arrowReader = arrowReader;
             this.allocator = allocator;
+            this.scanner = scanner;
             
-            // Load next batch
-            this.hasNextBatch = (boolean) arrowReader.getClass()
-                    .getMethod("loadNextBatch").invoke(arrowReader);
-            
-            if (hasNextBatch) {
-                Object root = arrowReader.getClass()
-                        .getMethod("getVectorSchemaRoot").invoke(arrowReader);
-                this.totalRowCount = (int) root.getClass()
-                        .getMethod("getRowCount").invoke(root);
+            // Load first batch via direct API
+            if (arrowReader.loadNextBatch()) {
+                this.currentRoot = arrowReader.getVectorSchemaRoot();
+                this.totalRowCount = currentRoot.getRowCount();
             }
         }
 
         @Override
         public boolean hasNext() {
-            return hasNextBatch && !closed;
+            return currentRoot != null && !closed;
         }
 
         @Override
@@ -293,33 +289,30 @@ public class LanceSDKTableReader implements LanceTableReader {
             }
 
             try {
-                // Get VectorSchemaRoot
-                Object root = arrowReader.getClass()
-                        .getMethod("getVectorSchemaRoot").invoke(arrowReader);
+                // Direct API calls - no reflection
+                VectorSchemaRoot root = currentRoot;
+                Schema schema = root.getSchema();
+                List<org.apache.arrow.vector.types.pojo.Field> fields = schema.getFields();
                 
-                Object schema = root.getClass().getMethod("getSchema").invoke(root);
-                @SuppressWarnings("unchecked")
-                List<Object> fields = (List<Object>) schema.getClass()
-                        .getMethod("getFields").invoke(schema);
-                
-                int rowCount = (int) root.getClass()
-                        .getMethod("getRowCount").invoke(root);
+                int rowCount = root.getRowCount();
 
                 String[] columnNames = new String[fields.size()];
                 int[] columnTypes = new int[fields.size()];
                 
                 for (int i = 0; i < fields.size(); i++) {
-                    columnNames[i] = (String) fields.get(i).getClass()
-                            .getMethod("getName").invoke(fields.get(i));
+                    columnNames[i] = fields.get(i).getName();
                     columnTypes[i] = 7; // VARCHAR
                 }
 
                 byte[] batchData = serializeBatch(root);
 
-                // Load next batch
+                // Load next batch - direct API
                 currentBatchIndex++;
-                hasNextBatch = (boolean) arrowReader.getClass()
-                        .getMethod("loadNextBatch").invoke(arrowReader);
+                if (arrowReader.loadNextBatch()) {
+                    currentRoot = arrowReader.getVectorSchemaRoot();
+                } else {
+                    currentRoot = null;
+                }
 
                 return new ArrowBatch(batchData, columnNames, columnTypes, rowCount);
             } catch (Exception e) {
@@ -339,32 +332,30 @@ public class LanceSDKTableReader implements LanceTableReader {
 
         @Override
         public void close() throws IOException {
-            if (!closed && arrowReader != null) {
+            if (!closed) {
                 try {
-                    arrowReader.getClass().getMethod("close").invoke(arrowReader);
+                    // Direct API calls - close resources
+                    if (arrowReader != null) {
+                        arrowReader.close();
+                    }
+                    if (scanner != null) {
+                        scanner.close();
+                    }
                 } catch (Exception e) {
-                    throw new IOException("Failed to close Arrow reader", e);
+                    throw new IOException("Failed to close resources", e);
                 }
             }
             closed = true;
         }
 
-        private byte[] serializeBatch(Object root) throws Exception {
+        private byte[] serializeBatch(VectorSchemaRoot root) throws Exception {
             try (
                 java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-                java.io.OutputStream stream = baos
+                org.apache.arrow.vector.ipc.ArrowStreamWriter writer = 
+                    new org.apache.arrow.vector.ipc.ArrowStreamWriter(root, null, baos)
             ) {
-                // Create ArrowStreamWriter
-                Class<?> writerClass = Class.forName("org.apache.arrow.vector.ipc.ArrowStreamWriter");
-                Object writer = writerClass.getConstructor(
-                        root.getClass(),
-                        Class.forName("org.apache.arrow.vector.dictionary.DictionaryProvider"),
-                        java.io.OutputStream.class
-                ).newInstance(root, null, stream);
-                
-                writerClass.getMethod("writeBatch").invoke(writer);
-                ((java.io.Closeable) writer).close();
-                
+                // Direct API call - write batch
+                writer.writeBatch();
                 return baos.toByteArray();
             }
         }

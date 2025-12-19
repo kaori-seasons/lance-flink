@@ -47,6 +47,7 @@ public class LanceBoundedSourceFunction extends BaseLanceSourceFunction {
     private int currentFragmentIndex = 0;
     private transient LanceOptimizer optimizer;
     private transient LanceOptimizationContext optimizationContext;
+    private transient LanceReadOptions effectiveReadOptions;  // Store optimized readOptions
 
     public LanceBoundedSourceFunction(
             LanceConfig config,
@@ -85,12 +86,17 @@ public class LanceBoundedSourceFunction extends BaseLanceSourceFunction {
                 
                 // Run optimizer
                 this.optimizationContext = optimizer.optimizeQuery(sql, availableColumns);
-                LOG.info("Query optimization completed. Rows reduction: {:.2f}x",
-                        (double) optimizationContext.getEstimatedRowsBefore() / 
-                        Math.max(optimizationContext.getEstimatedRowsAfter(), 1));
                 
-                // Apply optimizations to readOptions
-                applyOptimizationsToReadOptions();
+                if (optimizationContext.hasAnyOptimization()) {
+                    LOG.info("Query optimization completed. Rows reduction: {:.2f}x",
+                            (double) optimizationContext.getEstimatedRowsBefore() / 
+                            Math.max(optimizationContext.getEstimatedRowsAfter(), 1));
+                    
+                    // Apply optimizations to readOptions
+                    applyOptimizationsToReadOptions();
+                } else {
+                    LOG.debug("No applicable optimizations found for query: {}", sql);
+                }
             }
         } catch (Exception e) {
             LOG.warn("Query optimization failed, proceeding without optimizations", e);
@@ -130,18 +136,85 @@ public class LanceBoundedSourceFunction extends BaseLanceSourceFunction {
 
     /**
      * Apply optimization context to readOptions for execution.
+     * 
+     * This method applies the following optimizations:
+     * 1. Predicate Pushdown: Filters at storage layer
+     * 2. Column Pruning: Read only necessary columns
+     * 3. Top-N Pushdown: Limit and order by at storage layer
+     * 
+     * The optimized readOptions will be stored in effectiveReadOptions and used
+     * during actual data reading in readFragment().
      */
     private void applyOptimizationsToReadOptions() {
-        if (optimizationContext == null) {
+        if (optimizationContext == null || !optimizationContext.hasAnyOptimization()) {
+            LOG.debug("No optimizations to apply");
+            this.effectiveReadOptions = readOptions;  // Use original if no optimizations
             return;
         }
         
-        // The optimization context is stored in readOptions for use during read
-        // The actual application happens in LanceDatasetAdapter.readBatches()
-        LOG.debug("Optimizations ready for application: predicate={}, columns={}, topN={}",
-                optimizationContext.hasPushdownPredicate(),
-                optimizationContext.hasColumnPruning(),
-                optimizationContext.hasTopNPushdown());
+        try {
+            LanceReadOptions.Builder builder = new LanceReadOptions.Builder()
+                    .optimizationContext(optimizationContext);
+            
+            // Start with existing readOptions values
+            builder.columns(readOptions.getColumns());
+            if (readOptions.getVersion().isPresent()) {
+                builder.version(readOptions.getVersion().get());
+            }
+            if (readOptions.getOffset().isPresent()) {
+                builder.offset(readOptions.getOffset().get());
+            }
+            
+            // 1. Apply predicate pushdown (WHERE clause optimization)
+            String effectivePredicate = readOptions.getWhereClause().orElse("");
+            if (optimizationContext.hasPushdownPredicate()) {
+                String optimizedPredicate = optimizationContext.getPushdownPredicate().get();
+                effectivePredicate = optimizedPredicate;
+                LOG.info("Applied predicate pushdown: {} (original: {})", 
+                        optimizedPredicate,
+                        readOptions.getWhereClause().orElse("none"));
+            }
+            if (!effectivePredicate.isEmpty()) {
+                builder.whereClause(effectivePredicate);
+            }
+            
+            // 2. Apply column pruning (column selection optimization)
+            if (optimizationContext.hasColumnPruning()) {
+                java.util.Set<String> projectedColumns = optimizationContext.getProjectedColumns();
+                if (!projectedColumns.isEmpty()) {
+                    java.util.List<String> columnList = new java.util.ArrayList<>(projectedColumns);
+                    builder.columns(columnList);
+                    LOG.info("Applied column pruning: {} columns selected from {}",
+                            columnList.size(),
+                            readOptions.getColumns().isEmpty() ? "all" : readOptions.getColumns().size());
+                }
+            }
+            
+            // 3. Apply Top-N pushdown (LIMIT and ORDER BY optimization)
+            if (optimizationContext.hasTopNPushdown()) {
+                long limit = optimizationContext.getTopNLimit().get();
+                String orderColumn = optimizationContext.getOrderByColumn().get();
+                boolean descending = optimizationContext.isDescending();
+                builder.limit(limit);
+                LOG.info("Applied Top-N pushdown: LIMIT {} ORDER BY {} {}",
+                        limit,
+                        orderColumn,
+                        descending ? "DESC" : "ASC");
+            } else if (readOptions.getLimit().isPresent()) {
+                builder.limit(readOptions.getLimit().get());
+            }
+            
+            // Build the effective readOptions with optimizations applied
+            this.effectiveReadOptions = builder.build();
+            
+            LOG.info("ReadOptions optimized. Rows reduction = {:.2f}x",
+                    1.0 / Math.max(optimizationContext.getOptimizationRatio(), 0.01));
+            
+            LOG.debug("Effective ReadOptions: {}", effectiveReadOptions);
+        } catch (Exception e) {
+            LOG.warn("Failed to apply optimizations, proceeding with original readOptions", e);
+            this.effectiveReadOptions = readOptions;  // Fallback to original
+        }
     }
 
     /**
@@ -191,9 +264,12 @@ public class LanceBoundedSourceFunction extends BaseLanceSourceFunction {
 
         long recordsRead = 0;
         try {
-            // Open fragment reader with readOptions
+            // Use effective readOptions which includes optimizations
+            LanceReadOptions readOpts = effectiveReadOptions != null ? effectiveReadOptions : readOptions;
+            
+            // Open fragment reader with optimized readOptions
             org.apache.flink.connector.lance.format.RecordBatchIterator batches = 
-                    adapter.readBatches(readOptions);
+                    adapter.readBatches(readOpts);
             
             // Iterate through batches and emit rows
             while (batches.hasNext() && isRunning()) {

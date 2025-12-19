@@ -22,11 +22,11 @@
             <artifactId>flink-core</artifactId>
         </dependency>
 
-        <!-- Lance (commented out for Phase 1 - will be available in production) -->
-        <!-- <dependency>
-            <groupId>com.lancedb</groupId>
-            <artifactId>lance</artifactId>
-        </dependency> -->
+        <!-- Lance Java SDK (production-ready) -->
+        <dependency>
+            <groupId>org.lance</groupId>
+            <artifactId>lance-core</artifactId>
+        </dependency>
 
         <!-- Arrow -->
         <dependency>

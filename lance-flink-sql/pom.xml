@@ -32,6 +32,12 @@
             <artifactId>calcite-core</artifactId>
         </dependency>
 
+        <!-- Lance Java SDK (production-ready) -->
+        <dependency>
+            <groupId>org.lance</groupId>
+            <artifactId>lance-core</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>

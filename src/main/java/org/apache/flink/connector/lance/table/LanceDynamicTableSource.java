@@ -21,6 +21,7 @@ package org.apache.flink.connector.lance.table;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.lance.LanceInputFormat;
 import org.apache.flink.connector.lance.LanceSource;
+import org.apache.flink.connector.lance.aggregate.AggregateInfo;
 import org.apache.flink.connector.lance.config.LanceOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -30,11 +31,12 @@ import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.InputFormatProvider;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
+import org.apache.flink.table.connector.source.abilities.SupportsAggregatePushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.expressions.AggregateExpression;
 import org.apache.flink.table.expressions.CallExpression;
 import org.apache.flink.table.expressions.FieldReferenceExpression;
 import org.apache.flink.table.expressions.ResolvedExpression;
@@ -42,6 +44,7 @@ import org.apache.flink.table.expressions.ValueLiteralExpression;
 import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
@@ -53,16 +56,19 @@ import java.util.stream.Collectors;
 /**
  * Lance 动态表数据源。
  * 
- * <p>实现 ScanTableSource 接口，支持列裁剪、过滤下推和 Limit 下推。
+ * <p>实现 ScanTableSource 接口，支持列裁剪、过滤下推、Limit 下推和聚合下推。
  */
 public class LanceDynamicTableSource implements ScanTableSource, 
-        SupportsProjectionPushDown, SupportsFilterPushDown, SupportsLimitPushDown {
+        SupportsProjectionPushDown, SupportsFilterPushDown, SupportsLimitPushDown,
+        SupportsAggregatePushDown {
 
     private final LanceOptions options;
     private final DataType physicalDataType;
     private int[] projectedFields;
     private List<String> filters;
-    private Long limit;  // 新增：Limit 下推
+    private Long limit;  // Limit 下推
+    private AggregateInfo aggregateInfo;  // 聚合下推
+    private boolean aggregatePushDownAccepted;  // 聚合下推是否被接受
 
     public LanceDynamicTableSource(LanceOptions options, DataType physicalDataType) {
         this.options = options;
@@ -70,6 +76,8 @@ public class LanceDynamicTableSource implements ScanTableSource,
         this.projectedFields = null;
         this.filters = new ArrayList<>();
         this.limit = null;
+        this.aggregateInfo = null;
+        this.aggregatePushDownAccepted = false;
     }
 
     private LanceDynamicTableSource(LanceDynamicTableSource source) {
@@ -78,6 +86,8 @@ public class LanceDynamicTableSource implements ScanTableSource,
         this.projectedFields = source.projectedFields;
         this.filters = new ArrayList<>(source.filters);
         this.limit = source.limit;
+        this.aggregateInfo = source.aggregateInfo;
+        this.aggregatePushDownAccepted = source.aggregatePushDownAccepted;
     }
 
     @Override
@@ -413,5 +423,140 @@ public class LanceDynamicTableSource implements ScanTableSource,
      */
     public Long getLimit() {
         return limit;
+    }
+
+    // ==================== SupportsAggregatePushDown ====================
+
+    @Override
+    public boolean applyAggregates(
+            List<int[]> groupingSets,
+            List<AggregateExpression> aggregateExpressions,
+            DataType producedDataType) {
+        
+        // 目前只支持简单的单一分组集
+        if (groupingSets.size() != 1) {
+            return false;
+        }
+
+        int[] groupingSet = groupingSets.get(0);
+        RowType rowType = (RowType) physicalDataType.getLogicalType();
+        List<String> fieldNames = rowType.getFieldNames();
+
+        try {
+            AggregateInfo.Builder builder = AggregateInfo.builder();
+
+            // 处理分组列
+            List<String> groupByColumns = new ArrayList<>();
+            for (int fieldIndex : groupingSet) {
+                if (fieldIndex >= 0 && fieldIndex < fieldNames.size()) {
+                    groupByColumns.add(fieldNames.get(fieldIndex));
+                }
+            }
+            builder.groupBy(groupByColumns);
+            builder.groupByFieldIndices(groupingSet);
+
+            // 处理聚合表达式
+            int aggIndex = 0;
+            for (AggregateExpression aggExpr : aggregateExpressions) {
+                AggregateInfo.AggregateCall aggCall = convertAggregateExpression(aggExpr, fieldNames, aggIndex++);
+                if (aggCall == null) {
+                    // 不支持的聚合函数，拒绝下推
+                    return false;
+                }
+                builder.addAggregateCall(aggCall);
+            }
+
+            this.aggregateInfo = builder.build();
+            this.aggregatePushDownAccepted = true;
+            return true;
+
+        } catch (Exception e) {
+            // 转换失败，拒绝下推
+            return false;
+        }
+    }
+
+    /**
+     * 转换 Flink 聚合表达式为内部聚合调用
+     */
+    private AggregateInfo.AggregateCall convertAggregateExpression(
+            AggregateExpression aggExpr, 
+            List<String> fieldNames,
+            int aggIndex) {
+        
+        FunctionDefinition funcDef = aggExpr.getFunctionDefinition();
+        List<FieldReferenceExpression> args = aggExpr.getArgs();
+        String alias = "agg_" + aggIndex;
+
+        // COUNT(*)
+        if (funcDef == BuiltInFunctionDefinitions.COUNT) {
+            if (args.isEmpty()) {
+                // COUNT(*)
+                return new AggregateInfo.AggregateCall(
+                        AggregateInfo.AggregateFunction.COUNT, null, alias);
+            } else {
+                // COUNT(column)
+                String columnName = args.get(0).getName();
+                return new AggregateInfo.AggregateCall(
+                        AggregateInfo.AggregateFunction.COUNT, columnName, alias);
+            }
+        }
+
+        // SUM
+        if (funcDef == BuiltInFunctionDefinitions.SUM || funcDef == BuiltInFunctionDefinitions.SUM0) {
+            if (args.isEmpty()) {
+                return null;
+            }
+            String columnName = args.get(0).getName();
+            return new AggregateInfo.AggregateCall(
+                    AggregateInfo.AggregateFunction.SUM, columnName, alias);
+        }
+
+        // AVG
+        if (funcDef == BuiltInFunctionDefinitions.AVG) {
+            if (args.isEmpty()) {
+                return null;
+            }
+            String columnName = args.get(0).getName();
+            return new AggregateInfo.AggregateCall(
+                    AggregateInfo.AggregateFunction.AVG, columnName, alias);
+        }
+
+        // MIN
+        if (funcDef == BuiltInFunctionDefinitions.MIN) {
+            if (args.isEmpty()) {
+                return null;
+            }
+            String columnName = args.get(0).getName();
+            return new AggregateInfo.AggregateCall(
+                    AggregateInfo.AggregateFunction.MIN, columnName, alias);
+        }
+
+        // MAX
+        if (funcDef == BuiltInFunctionDefinitions.MAX) {
+            if (args.isEmpty()) {
+                return null;
+            }
+            String columnName = args.get(0).getName();
+            return new AggregateInfo.AggregateCall(
+                    AggregateInfo.AggregateFunction.MAX, columnName, alias);
+        }
+
+        // 不支持的聚合函数
+        return null;
+    }
+
+    /**
+     * 获取聚合信息
+     */
+    public AggregateInfo getAggregateInfo() {
+        return aggregateInfo;
+    }
+
+    /**
+     * 是否启用了聚合下推
+     */
+    public boolean isAggregatePushDownAccepted() {
+        return aggregatePushDownAccepted;
     }
 }

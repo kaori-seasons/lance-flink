@@ -279,6 +279,66 @@ class LanceSqlITCase {
     }
 
     @Test
+    @DisplayName("测试 S3 Catalog 配置选项定义")
+    void testS3CatalogConfigOptions() {
+        // S3 配置选项
+        assertThat(LanceCatalogFactory.S3_ACCESS_KEY.key()).isEqualTo("s3-access-key");
+        assertThat(LanceCatalogFactory.S3_SECRET_KEY.key()).isEqualTo("s3-secret-key");
+        assertThat(LanceCatalogFactory.S3_REGION.key()).isEqualTo("s3-region");
+        assertThat(LanceCatalogFactory.S3_ENDPOINT.key()).isEqualTo("s3-endpoint");
+        assertThat(LanceCatalogFactory.S3_VIRTUAL_HOSTED_STYLE.key()).isEqualTo("s3-virtual-hosted-style");
+        assertThat(LanceCatalogFactory.S3_ALLOW_HTTP.key()).isEqualTo("s3-allow-http");
+        
+        // 默认值
+        assertThat(LanceCatalogFactory.S3_VIRTUAL_HOSTED_STYLE.defaultValue()).isTrue();
+        assertThat(LanceCatalogFactory.S3_ALLOW_HTTP.defaultValue()).isFalse();
+    }
+
+    @Test
+    @DisplayName("测试 LanceCatalog S3 远程存储识别")
+    void testLanceCatalogRemoteStorageDetection() {
+        // S3 路径应该被识别为远程存储
+        LanceCatalog s3Catalog = new LanceCatalog("test", "default", "s3://bucket/path");
+        assertThat(s3Catalog.isRemoteStorage()).isTrue();
+        
+        // S3A 路径
+        LanceCatalog s3aCatalog = new LanceCatalog("test", "default", "s3a://bucket/path");
+        assertThat(s3aCatalog.isRemoteStorage()).isTrue();
+        
+        // GCS 路径
+        LanceCatalog gcsCatalog = new LanceCatalog("test", "default", "gs://bucket/path");
+        assertThat(gcsCatalog.isRemoteStorage()).isTrue();
+        
+        // Azure 路径
+        LanceCatalog azCatalog = new LanceCatalog("test", "default", "az://container/path");
+        assertThat(azCatalog.isRemoteStorage()).isTrue();
+        
+        // 本地路径应该被识别为本地存储
+        LanceCatalog localCatalog = new LanceCatalog("test", "default", warehousePath);
+        assertThat(localCatalog.isRemoteStorage()).isFalse();
+    }
+
+    @Test
+    @DisplayName("测试 LanceCatalog 带存储选项构造")
+    void testLanceCatalogWithStorageOptions() {
+        Map<String, String> storageOptions = new HashMap<>();
+        storageOptions.put("aws_access_key_id", "test-key");
+        storageOptions.put("aws_secret_access_key", "test-secret");
+        storageOptions.put("aws_region", "us-east-1");
+        
+        LanceCatalog catalog = new LanceCatalog(
+                "test_catalog", 
+                "default", 
+                "s3://bucket/warehouse",
+                storageOptions
+        );
+        
+        assertThat(catalog.getStorageOptions()).containsEntry("aws_access_key_id", "test-key");
+        assertThat(catalog.getStorageOptions()).containsEntry("aws_secret_access_key", "test-secret");
+        assertThat(catalog.getStorageOptions()).containsEntry("aws_region", "us-east-1");
+    }
+
+    @Test
     @DisplayName("测试向量检索 UDF 配置")
     void testVectorSearchFunctionConfiguration() {
         LanceVectorSearchFunction function = new LanceVectorSearchFunction();

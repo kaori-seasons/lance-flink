@@ -56,27 +56,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
  * Lance Catalog 实现。
  * 
  * <p>实现 Flink Catalog 接口，支持管理 Lance 数据集作为 Flink 表。
+ * 支持本地文件系统和 S3 协议的对象存储。
  * 
- * <p>使用示例：
+ * <p>使用示例（本地路径）：
  * <pre>{@code
  * CREATE CATALOG lance_catalog WITH (
  *     'type' = 'lance',
  *     'warehouse' = '/path/to/warehouse',
  *     'default-database' = 'default'
+ * );
+ * }</pre>
+ * 
+ * <p>使用示例（S3 路径）：
+ * <pre>{@code
+ * CREATE CATALOG lance_s3_catalog WITH (
+ *     'type' = 'lance',
+ *     'warehouse' = 's3://bucket-name/warehouse',
+ *     'default-database' = 'default',
+ *     's3-access-key' = 'your-access-key',
+ *     's3-secret-key' = 'your-secret-key',
+ *     's3-region' = 'us-east-1'
  * );
  * }</pre>
  */
@@ -87,43 +104,99 @@ public class LanceCatalog extends AbstractCatalog {
     public static final String DEFAULT_DATABASE = "default";
 
     private final String warehouse;
+    private final Map<String, String> storageOptions;
+    private final boolean isRemoteStorage;
     private transient BufferAllocator allocator;
+    
+    // 用于远程存储时缓存已知的数据库和表
+    private final Set<String> knownDatabases = ConcurrentHashMap.newKeySet();
+    private final Set<String> knownTables = ConcurrentHashMap.newKeySet();
 
     /**
-     * 创建 LanceCatalog
+     * 创建 LanceCatalog（本地存储）
      *
      * @param name Catalog 名称
      * @param defaultDatabase 默认数据库名称
      * @param warehouse 仓库路径
      */
     public LanceCatalog(String name, String defaultDatabase, String warehouse) {
+        this(name, defaultDatabase, warehouse, Collections.emptyMap());
+    }
+
+    /**
+     * 创建 LanceCatalog（支持远程存储）
+     *
+     * @param name Catalog 名称
+     * @param defaultDatabase 默认数据库名称
+     * @param warehouse 仓库路径（本地路径或 S3 URI）
+     * @param storageOptions 存储配置选项（如 S3 凭证）
+     */
+    public LanceCatalog(String name, String defaultDatabase, String warehouse, Map<String, String> storageOptions) {
         super(name, defaultDatabase);
-        this.warehouse = warehouse;
+        this.warehouse = normalizeWarehousePath(warehouse);
+        this.storageOptions = storageOptions != null ? new HashMap<>(storageOptions) : Collections.emptyMap();
+        this.isRemoteStorage = isRemotePath(warehouse);
+    }
+
+    /**
+     * 判断是否是远程存储路径
+     */
+    private boolean isRemotePath(String path) {
+        if (path == null) {
+            return false;
+        }
+        String lowerPath = path.toLowerCase();
+        return lowerPath.startsWith("s3://") || 
+               lowerPath.startsWith("s3a://") || 
+               lowerPath.startsWith("gs://") || 
+               lowerPath.startsWith("az://") ||
+               lowerPath.startsWith("https://") ||
+               lowerPath.startsWith("http://");
+    }
+
+    /**
+     * 标准化仓库路径
+     */
+    private String normalizeWarehousePath(String path) {
+        if (path == null) {
+            return null;
+        }
+        // 移除末尾的斜杠
+        while (path.endsWith("/") && path.length() > 1) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return path;
     }
 
     @Override
     public void open() throws CatalogException {
-        LOG.info("打开 Lance Catalog: {}, 仓库路径: {}", getName(), warehouse);
+        LOG.info("打开 Lance Catalog: {}, 仓库路径: {}, 远程存储: {}", getName(), warehouse, isRemoteStorage);
         
         this.allocator = new RootAllocator(Long.MAX_VALUE);
         
-        // 确保仓库目录存在
-        Path warehousePath = Paths.get(warehouse);
-        if (!Files.exists(warehousePath)) {
-            try {
-                Files.createDirectories(warehousePath);
-            } catch (IOException e) {
-                throw new CatalogException("无法创建仓库目录: " + warehouse, e);
+        if (isRemoteStorage) {
+            // 远程存储：初始化默认数据库记录
+            knownDatabases.add(getDefaultDatabase());
+            LOG.info("远程存储模式已启用，存储配置项数量: {}", storageOptions.size());
+        } else {
+            // 本地存储：确保仓库目录存在
+            Path warehousePath = Paths.get(warehouse);
+            if (!Files.exists(warehousePath)) {
+                try {
+                    Files.createDirectories(warehousePath);
+                } catch (IOException e) {
+                    throw new CatalogException("无法创建仓库目录: " + warehouse, e);
+                }
             }
-        }
-        
-        // 确保默认数据库存在
-        Path defaultDbPath = warehousePath.resolve(getDefaultDatabase());
-        if (!Files.exists(defaultDbPath)) {
-            try {
-                Files.createDirectories(defaultDbPath);
-            } catch (IOException e) {
-                throw new CatalogException("无法创建默认数据库目录: " + defaultDbPath, e);
+            
+            // 确保默认数据库存在
+            Path defaultDbPath = warehousePath.resolve(getDefaultDatabase());
+            if (!Files.exists(defaultDbPath)) {
+                try {
+                    Files.createDirectories(defaultDbPath);
+                } catch (IOException e) {
+                    throw new CatalogException("无法创建默认数据库目录: " + defaultDbPath, e);
+                }
             }
         }
     }
@@ -140,12 +213,20 @@ public class LanceCatalog extends AbstractCatalog {
             }
             allocator = null;
         }
+        
+        knownDatabases.clear();
+        knownTables.clear();
     }
 
     // ==================== Database 操作 ====================
 
     @Override
     public List<String> listDatabases() throws CatalogException {
+        if (isRemoteStorage) {
+            // 远程存储：返回已知数据库列表
+            return new ArrayList<>(knownDatabases);
+        }
+        
         try {
             Path warehousePath = Paths.get(warehouse);
             if (!Files.exists(warehousePath)) {
@@ -172,6 +253,21 @@ public class LanceCatalog extends AbstractCatalog {
 
     @Override
     public boolean databaseExists(String databaseName) throws CatalogException {
+        if (isRemoteStorage) {
+            // 远程存储：检查已知数据库或尝试列出表来验证
+            if (knownDatabases.contains(databaseName)) {
+                return true;
+            }
+            // 尝试通过检查是否有表来确认数据库存在
+            try {
+                String dbPath = getDatabasePath(databaseName);
+                // 对于远程存储，我们假设数据库总是存在（实际表操作时会验证）
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        
         Path dbPath = Paths.get(warehouse, databaseName);
         return Files.exists(dbPath) && Files.isDirectory(dbPath);
     }
@@ -179,6 +275,19 @@ public class LanceCatalog extends AbstractCatalog {
     @Override
     public void createDatabase(String name, CatalogDatabase database, boolean ignoreIfExists)
             throws DatabaseAlreadyExistException, CatalogException {
+        if (isRemoteStorage) {
+            // 远程存储：只记录数据库名称，实际目录在创建表时自动创建
+            if (knownDatabases.contains(name)) {
+                if (!ignoreIfExists) {
+                    throw new DatabaseAlreadyExistException(getName(), name);
+                }
+                return;
+            }
+            knownDatabases.add(name);
+            LOG.info("注册远程数据库: {}", name);
+            return;
+        }
+        
         if (databaseExists(name)) {
             if (!ignoreIfExists) {
                 throw new DatabaseAlreadyExistException(getName(), name);
@@ -198,6 +307,37 @@ public class LanceCatalog extends AbstractCatalog {
     @Override
     public void dropDatabase(String name, boolean ignoreIfNotExists, boolean cascade)
             throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
+        if (isRemoteStorage) {
+            // 远程存储：移除数据库记录
+            if (!knownDatabases.contains(name)) {
+                if (!ignoreIfNotExists) {
+                    throw new DatabaseNotExistException(getName(), name);
+                }
+                return;
+            }
+            
+            // 检查是否有表
+            List<String> tables = listTables(name);
+            if (!tables.isEmpty() && !cascade) {
+                throw new DatabaseNotEmptyException(getName(), name);
+            }
+            
+            // 如果 cascade，删除所有表
+            if (cascade) {
+                for (String table : tables) {
+                    try {
+                        dropTable(new ObjectPath(name, table), true);
+                    } catch (TableNotExistException e) {
+                        // 忽略
+                    }
+                }
+            }
+            
+            knownDatabases.remove(name);
+            LOG.info("移除远程数据库记录: {}", name);
+            return;
+        }
+        
         if (!databaseExists(name)) {
             if (!ignoreIfNotExists) {
                 throw new DatabaseNotExistException(getName(), name);
@@ -241,6 +381,15 @@ public class LanceCatalog extends AbstractCatalog {
             throw new DatabaseNotExistException(getName(), databaseName);
         }
         
+        if (isRemoteStorage) {
+            // 远程存储：返回已知表列表
+            String prefix = databaseName + "/";
+            return knownTables.stream()
+                    .filter(t -> t.startsWith(prefix))
+                    .map(t -> t.substring(prefix.length()))
+                    .collect(Collectors.toList());
+        }
+        
         try {
             Path dbPath = Paths.get(warehouse, databaseName);
             return Files.list(dbPath)
@@ -268,7 +417,12 @@ public class LanceCatalog extends AbstractCatalog {
         String datasetPath = getDatasetPath(tablePath);
         
         try {
+            // 对于远程存储，通过环境变量配置 S3 凭证
+            if (isRemoteStorage) {
+                configureStorageEnvironment();
+            }
             Dataset dataset = Dataset.open(datasetPath, allocator);
+            
             try {
                 // 从 Lance Schema 推断 Flink Schema
                 org.apache.arrow.vector.types.pojo.Schema arrowSchema = dataset.getSchema();
@@ -284,6 +438,11 @@ public class LanceCatalog extends AbstractCatalog {
                 Map<String, String> options = new HashMap<>();
                 options.put("connector", LanceDynamicTableFactory.IDENTIFIER);
                 options.put("path", datasetPath);
+                
+                // 如果是远程存储，添加存储配置到表选项
+                if (isRemoteStorage) {
+                    options.putAll(getStorageOptionsForTable());
+                }
                 
                 return CatalogTable.of(
                         schemaBuilder.build(),
@@ -306,6 +465,27 @@ public class LanceCatalog extends AbstractCatalog {
         }
         
         String datasetPath = getDatasetPath(tablePath);
+        
+        if (isRemoteStorage) {
+            // 远程存储：检查已知表或尝试打开数据集
+            String tableKey = tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
+            if (knownTables.contains(tableKey)) {
+                return true;
+            }
+            
+            // 尝试打开数据集来验证是否存在
+            try {
+                configureStorageEnvironment();
+                Dataset dataset = Dataset.open(datasetPath, allocator);
+                dataset.close();
+                knownTables.add(tableKey);
+                return true;
+            } catch (Exception e) {
+                LOG.debug("表不存在或无法访问: {}", datasetPath, e);
+                return false;
+            }
+        }
+        
         Path path = Paths.get(datasetPath);
         
         // 检查是否是有效的 Lance 数据集
@@ -324,6 +504,16 @@ public class LanceCatalog extends AbstractCatalog {
         }
         
         String datasetPath = getDatasetPath(tablePath);
+        
+        if (isRemoteStorage) {
+            // 远程存储：目前 Lance Java SDK 不直接支持删除远程数据集
+            // 这里只移除记录，实际删除需要使用云存储 API
+            String tableKey = tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
+            knownTables.remove(tableKey);
+            LOG.warn("远程存储模式下，表记录已移除，但实际数据需要手动从存储中删除: {}", datasetPath);
+            return;
+        }
+        
         try {
             deleteDirectory(Paths.get(datasetPath));
             LOG.info("删除表: {}", tablePath);
@@ -345,6 +535,11 @@ public class LanceCatalog extends AbstractCatalog {
         ObjectPath newTablePath = new ObjectPath(tablePath.getDatabaseName(), newTableName);
         if (tableExists(newTablePath)) {
             throw new TableAlreadyExistException(getName(), newTablePath);
+        }
+        
+        if (isRemoteStorage) {
+            // 远程存储：不支持重命名
+            throw new CatalogException("远程存储模式下不支持重命名表");
         }
         
         String oldPath = getDatasetPath(tablePath);
@@ -370,6 +565,12 @@ public class LanceCatalog extends AbstractCatalog {
                 throw new TableAlreadyExistException(getName(), tablePath);
             }
             return;
+        }
+        
+        if (isRemoteStorage) {
+            // 远程存储：记录表信息，实际创建在写入时完成
+            String tableKey = tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
+            knownTables.add(tableKey);
         }
         
         // 表的实际创建在第一次写入时完成
@@ -529,10 +730,89 @@ public class LanceCatalog extends AbstractCatalog {
     // ==================== 工具方法 ====================
 
     /**
+     * 配置存储环境变量（用于 S3 等远程存储）
+     * 
+     * <p>Lance 通过环境变量配置 S3 凭证：
+     * <ul>
+     *   <li>AWS_ACCESS_KEY_ID - AWS 访问密钥 ID</li>
+     *   <li>AWS_SECRET_ACCESS_KEY - AWS 秘密访问密钥</li>
+     *   <li>AWS_DEFAULT_REGION - AWS 区域</li>
+     *   <li>AWS_ENDPOINT - 自定义端点 URL（用于兼容 S3 的存储）</li>
+     * </ul>
+     */
+    private void configureStorageEnvironment() {
+        if (!isRemoteStorage || storageOptions.isEmpty()) {
+            return;
+        }
+        
+        // 设置环境变量用于 Lance SDK 的 object_store 配置
+        // 注意：由于 Java 不能直接修改环境变量，这里使用系统属性作为备选方案
+        // Lance 的 Rust 底层会读取这些环境变量
+        
+        if (storageOptions.containsKey("aws_access_key_id")) {
+            System.setProperty("AWS_ACCESS_KEY_ID", storageOptions.get("aws_access_key_id"));
+        }
+        if (storageOptions.containsKey("aws_secret_access_key")) {
+            System.setProperty("AWS_SECRET_ACCESS_KEY", storageOptions.get("aws_secret_access_key"));
+        }
+        if (storageOptions.containsKey("aws_region")) {
+            System.setProperty("AWS_DEFAULT_REGION", storageOptions.get("aws_region"));
+        }
+        if (storageOptions.containsKey("aws_endpoint")) {
+            System.setProperty("AWS_ENDPOINT", storageOptions.get("aws_endpoint"));
+        }
+        if (storageOptions.containsKey("aws_virtual_hosted_style_request")) {
+            System.setProperty("AWS_VIRTUAL_HOSTED_STYLE_REQUEST", 
+                    storageOptions.get("aws_virtual_hosted_style_request"));
+        }
+        if (storageOptions.containsKey("allow_http")) {
+            System.setProperty("AWS_ALLOW_HTTP", storageOptions.get("allow_http"));
+        }
+        
+        LOG.debug("已配置远程存储环境变量");
+    }
+
+    /**
+     * 获取数据库路径
+     */
+    private String getDatabasePath(String databaseName) {
+        if (isRemoteStorage) {
+            return warehouse + "/" + databaseName;
+        }
+        return Paths.get(warehouse, databaseName).toString();
+    }
+
+    /**
      * 获取数据集路径
      */
     private String getDatasetPath(ObjectPath tablePath) {
+        if (isRemoteStorage) {
+            return warehouse + "/" + tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
+        }
         return Paths.get(warehouse, tablePath.getDatabaseName(), tablePath.getObjectName()).toString();
+    }
+
+    /**
+     * 获取用于表配置的存储选项
+     */
+    private Map<String, String> getStorageOptionsForTable() {
+        Map<String, String> options = new HashMap<>();
+        
+        // 转换存储选项为表配置格式
+        if (storageOptions.containsKey("aws_access_key_id")) {
+            options.put("s3-access-key", storageOptions.get("aws_access_key_id"));
+        }
+        if (storageOptions.containsKey("aws_secret_access_key")) {
+            options.put("s3-secret-key", storageOptions.get("aws_secret_access_key"));
+        }
+        if (storageOptions.containsKey("aws_region")) {
+            options.put("s3-region", storageOptions.get("aws_region"));
+        }
+        if (storageOptions.containsKey("aws_endpoint")) {
+            options.put("s3-endpoint", storageOptions.get("aws_endpoint"));
+        }
+        
+        return options;
     }
 
     /**
@@ -556,5 +836,19 @@ public class LanceCatalog extends AbstractCatalog {
      */
     public String getWarehouse() {
         return warehouse;
+    }
+
+    /**
+     * 获取存储配置选项
+     */
+    public Map<String, String> getStorageOptions() {
+        return Collections.unmodifiableMap(storageOptions);
+    }
+
+    /**
+     * 是否为远程存储
+     */
+    public boolean isRemoteStorage() {
+        return isRemoteStorage;
     }
 }

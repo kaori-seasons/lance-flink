@@ -46,17 +46,17 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Lance 数据源实现。
+ * Lance data source implementation.
  * 
- * <p>从 Lance 数据集中读取数据并转换为 Flink RowData。
- * <p>支持列裁剪、谓词下推和 Limit 下推优化。
+ * <p>Reads data from Lance dataset and converts to Flink RowData.
+ * <p>Supports column pruning, predicate push-down and Limit push-down optimization.
  * 
- * <p>使用示例：
+ * <p>Usage example:
  * <pre>{@code
  * LanceOptions options = LanceOptions.builder()
  *     .path("/path/to/lance/dataset")
  *     .readBatchSize(1024)
- *     .readLimit(100L)  // Limit 下推
+ *     .readLimit(100L)  // Limit push-down
  *     .build();
  * 
  * LanceSource source = new LanceSource(options, rowType);
@@ -71,18 +71,18 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
     private final LanceOptions options;
     private final RowType rowType;
     private final String[] selectedColumns;
-    private final Long readLimit;  // 新增：Limit 下推
+    private final Long readLimit;  // Added: Limit push-down
 
     private transient volatile boolean running;
     private transient BufferAllocator allocator;
     private transient Dataset dataset;
     private transient RowDataConverter converter;
-    private transient long emittedCount;  // 新增：已输出的行数
+    private transient long emittedCount;  // Added: emitted row count
 
     /**
-     * 创建 LanceSource
+     * Create LanceSource
      *
-     * @param options Lance 配置选项
+     * @param options Lance configuration options
      * @param rowType Flink RowType
      */
     public LanceSource(LanceOptions options, RowType rowType) {
@@ -97,9 +97,9 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
     }
 
     /**
-     * 创建 LanceSource（自动推断 Schema）
+     * Create LanceSource (auto-infer Schema)
      *
-     * @param options Lance 配置选项
+     * @param options Lance configuration options
      */
     public LanceSource(LanceOptions options) {
         this(options, null);
@@ -109,74 +109,74 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
         
-        LOG.info("打开 Lance 数据源: {}", options.getPath());
+        LOG.info("Opening Lance data source: {}", options.getPath());
         if (readLimit != null) {
-            LOG.info("Limit 下推生效，最大读取行数: {}", readLimit);
+            LOG.info("Limit push-down enabled, max read rows: {}", readLimit);
         }
         
         this.running = true;
         this.emittedCount = 0;
         this.allocator = new RootAllocator(Long.MAX_VALUE);
         
-        // 打开 Lance 数据集
+        // Open Lance dataset
         String datasetPath = options.getPath();
         if (datasetPath == null || datasetPath.isEmpty()) {
-            throw new IllegalArgumentException("Lance 数据集路径不能为空");
+            throw new IllegalArgumentException("Lance dataset path cannot be empty");
         }
         
         Path path = Paths.get(datasetPath);
         try {
             this.dataset = Dataset.open(path.toString(), allocator);
         } catch (Exception e) {
-            throw new IOException("无法打开 Lance 数据集: " + datasetPath, e);
+            throw new IOException("Cannot open Lance dataset: " + datasetPath, e);
         }
         
-        // 初始化 RowDataConverter
+        // Initialize RowDataConverter
         RowType actualRowType = this.rowType;
         if (actualRowType == null) {
-            // 从数据集 Schema 推断 RowType
+            // Infer RowType from dataset Schema
             Schema arrowSchema = dataset.getSchema();
             actualRowType = LanceTypeConverter.toFlinkRowType(arrowSchema);
         }
         this.converter = new RowDataConverter(actualRowType);
         
-        LOG.info("Lance 数据源已打开，Schema: {}", actualRowType);
+        LOG.info("Lance data source opened, Schema: {}", actualRowType);
     }
 
     @Override
     public void run(SourceContext<RowData> ctx) throws Exception {
-        LOG.info("开始读取 Lance 数据集: {}", options.getPath());
+        LOG.info("Start reading Lance dataset: {}", options.getPath());
         
         int subtaskIndex = getRuntimeContext().getIndexOfThisSubtask();
         int numSubtasks = getRuntimeContext().getNumberOfParallelSubtasks();
         
         String filter = options.getReadFilter();
         
-        // 如果有过滤条件，使用 Dataset 级别扫描（只在第一个子任务执行，避免重复数据）
+        // If filter condition exists, use Dataset level scan (only execute on first subtask to avoid duplicate data)
         if (filter != null && !filter.isEmpty()) {
             if (subtaskIndex == 0) {
-                LOG.info("使用 Dataset 级别扫描（带过滤条件）");
+                LOG.info("Using Dataset level scan (with filter condition)");
                 readDatasetWithFilter(ctx);
             } else {
-                LOG.info("子任务 {} 跳过（过滤模式下只有子任务 0 执行）", subtaskIndex);
+                LOG.info("Subtask {} skipped (only subtask 0 executes in filter mode)", subtaskIndex);
             }
         } else if (readLimit != null) {
-            // 有 Limit 时，只在第一个子任务执行，避免重复数据
+            // With Limit, only execute on first subtask to avoid duplicate data
             if (subtaskIndex == 0) {
-                LOG.info("使用 Dataset 级别扫描（带 Limit）");
+                LOG.info("Using Dataset level scan (with Limit)");
                 readDatasetWithFilter(ctx);
             } else {
-                LOG.info("子任务 {} 跳过（Limit 模式下只有子任务 0 执行）", subtaskIndex);
+                LOG.info("Subtask {} skipped (only subtask 0 executes in Limit mode)", subtaskIndex);
             }
         } else {
-            // 无过滤条件和 Limit 时，使用 Fragment 级别并行扫描
+            // Without filter condition and Limit, use Fragment level parallel scan
             List<Fragment> fragments = dataset.getFragments();
-            LOG.info("数据集共有 {} 个 Fragment，当前子任务 {}/{}", 
+            LOG.info("Dataset has {} Fragments, current subtask {}/{}", 
                     fragments.size(), subtaskIndex, numSubtasks);
             
-            // 按子任务分配 Fragment
+            // Assign Fragments by subtask
             for (int i = 0; i < fragments.size() && running && !isLimitReached(); i++) {
-                // 简单的轮询分配策略
+                // Simple round-robin assignment strategy
                 if (i % numSubtasks != subtaskIndex) {
                     continue;
                 }
@@ -186,40 +186,40 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
             }
         }
         
-        LOG.info("Lance 数据源读取完成，共输出 {} 行", emittedCount);
+        LOG.info("Lance data source read completed, total emitted {} rows", emittedCount);
     }
 
     /**
-     * 使用 Dataset 级别扫描（支持过滤条件和 Limit）
+     * Use Dataset level scan (supports filter conditions and Limit)
      */
     private void readDatasetWithFilter(SourceContext<RowData> ctx) throws Exception {
-        // 构建扫描选项
+        // Build scan options
         ScanOptions.Builder scanOptionsBuilder = new ScanOptions.Builder();
         
-        // 设置批次大小
+        // Set batch size
         scanOptionsBuilder.batchSize(options.getReadBatchSize());
         
-        // 设置列过滤
+        // Set column filter
         if (selectedColumns != null && selectedColumns.length > 0) {
             scanOptionsBuilder.columns(Arrays.asList(selectedColumns));
         }
         
-        // 设置数据过滤条件
+        // Set data filter condition
         String filter = options.getReadFilter();
         if (filter != null && !filter.isEmpty()) {
-            LOG.info("应用过滤条件: {}", filter);
+            LOG.info("Applying filter condition: {}", filter);
             scanOptionsBuilder.filter(filter);
         }
         
         ScanOptions scanOptions = scanOptionsBuilder.build();
         
-        // 使用 Dataset 级别扫描
+        // Use Dataset level scan
         try (LanceScanner scanner = dataset.newScan(scanOptions)) {
             try (ArrowReader reader = scanner.scanBatches()) {
                 while (reader.loadNextBatch() && running && !isLimitReached()) {
                     VectorSchemaRoot root = reader.getVectorSchemaRoot();
                     
-                    // 转换为 RowData 并输出
+                    // Convert to RowData and output
                     List<RowData> rows = converter.toRowDataList(root);
                     synchronized (ctx.getCheckpointLock()) {
                         for (RowData row : rows) {
@@ -235,38 +235,38 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
         }
         
         if (isLimitReached()) {
-            LOG.info("已达到 Limit 限制 ({})，停止读取", readLimit);
+            LOG.info("Reached Limit ({}), stop reading", readLimit);
         }
     }
 
     /**
-     * 读取单个 Fragment（不带过滤条件，但支持 Limit）
+     * Read single Fragment (without filter condition, but supports Limit)
      */
     private void readFragment(SourceContext<RowData> ctx, Fragment fragment) throws Exception {
-        LOG.debug("读取 Fragment: {}", fragment.getId());
+        LOG.debug("Reading Fragment: {}", fragment.getId());
         
-        // 构建扫描选项
+        // Build scan options
         ScanOptions.Builder scanOptionsBuilder = new ScanOptions.Builder();
         
-        // 设置批次大小
+        // Set batch size
         scanOptionsBuilder.batchSize(options.getReadBatchSize());
         
-        // 设置列过滤
+        // Set column filter
         if (selectedColumns != null && selectedColumns.length > 0) {
             scanOptionsBuilder.columns(Arrays.asList(selectedColumns));
         }
         
-        // 注意：Fragment 级别扫描不使用 filter，filter 只在 Dataset 级别支持
+        // Note: Fragment level scan does not use filter, filter is only supported at Dataset level
         
         ScanOptions scanOptions = scanOptionsBuilder.build();
         
-        // 创建 Scanner 并读取数据
+        // Create Scanner and read data
         try (LanceScanner scanner = fragment.newScan(scanOptions)) {
             try (ArrowReader reader = scanner.scanBatches()) {
                 while (reader.loadNextBatch() && running && !isLimitReached()) {
                     VectorSchemaRoot root = reader.getVectorSchemaRoot();
                     
-                    // 转换为 RowData 并输出
+                    // Convert to RowData and output
                     List<RowData> rows = converter.toRowDataList(root);
                     synchronized (ctx.getCheckpointLock()) {
                         for (RowData row : rows) {
@@ -283,7 +283,7 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
     }
 
     /**
-     * 检查是否已达到 Limit 限制
+     * Check if Limit has been reached
      */
     private boolean isLimitReached() {
         return readLimit != null && emittedCount >= readLimit;
@@ -291,13 +291,13 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
 
     @Override
     public void cancel() {
-        LOG.info("取消 Lance 数据源");
+        LOG.info("Cancel Lance data source");
         this.running = false;
     }
 
     @Override
     public void close() throws Exception {
-        LOG.info("关闭 Lance 数据源");
+        LOG.info("Closing Lance data source");
         
         this.running = false;
         
@@ -305,7 +305,7 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
             try {
                 dataset.close();
             } catch (Exception e) {
-                LOG.warn("关闭 Lance 数据集时出错", e);
+                LOG.warn("Error closing Lance dataset", e);
             }
             dataset = null;
         }
@@ -314,7 +314,7 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
             try {
                 allocator.close();
             } catch (Exception e) {
-                LOG.warn("关闭内存分配器时出错", e);
+                LOG.warn("Error closing memory allocator", e);
             }
             allocator = null;
         }
@@ -323,42 +323,42 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
     }
 
     /**
-     * 获取 RowType
+     * Get RowType
      */
     public RowType getRowType() {
         return rowType;
     }
 
     /**
-     * 获取配置选项
+     * Get configuration options
      */
     public LanceOptions getOptions() {
         return options;
     }
 
     /**
-     * 获取选择的列
+     * Get selected columns
      */
     public String[] getSelectedColumns() {
         return selectedColumns;
     }
 
     /**
-     * Builder 模式构建器
+     * Builder pattern constructor
      */
     public static Builder builder() {
         return new Builder();
     }
 
     /**
-     * LanceSource 构建器
+     * LanceSource Builder
      */
     public static class Builder {
         private String path;
         private int batchSize = 1024;
         private List<String> columns;
         private String filter;
-        private Long limit;  // 新增
+        private Long limit;  // Added
         private RowType rowType;
 
         public Builder path(String path) {
@@ -393,7 +393,7 @@ public class LanceSource extends RichParallelSourceFunction<RowData> {
 
         public LanceSource build() {
             if (path == null || path.isEmpty()) {
-                throw new IllegalArgumentException("数据集路径不能为空");
+                throw new IllegalArgumentException("Dataset path cannot be empty");
             }
 
             LanceOptions options = LanceOptions.builder()

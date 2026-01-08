@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * LanceIndexBuilder 单元测试。
+ * LanceIndexBuilder unit tests.
  */
 class LanceIndexBuilderTest {
 
@@ -48,7 +48,7 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试 IVF_PQ 索引配置构建")
+    @DisplayName("Test IVF_PQ index configuration build")
     void testIvfPqIndexConfiguration() {
         LanceIndexBuilder builder = LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -60,12 +60,12 @@ class LanceIndexBuilderTest {
                 .metricType(MetricType.L2)
                 .build();
 
-        // 验证配置 - 通过构建成功验证
+        // Verify configuration - by successful build
         assertThat(builder).isNotNull();
     }
 
     @Test
-    @DisplayName("测试 IVF_HNSW 索引配置构建")
+    @DisplayName("Test IVF_HNSW index configuration build")
     void testIvfHnswIndexConfiguration() {
         LanceIndexBuilder builder = LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -82,7 +82,7 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试 IVF_FLAT 索引配置构建")
+    @DisplayName("Test IVF_FLAT index configuration build")
     void testIvfFlatIndexConfiguration() {
         LanceIndexBuilder builder = LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -96,7 +96,7 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试索引类型枚举")
+    @DisplayName("Test index type enum")
     void testIndexTypeEnum() {
         assertThat(IndexType.fromValue("IVF_PQ")).isEqualTo(IndexType.IVF_PQ);
         assertThat(IndexType.fromValue("ivf_pq")).isEqualTo(IndexType.IVF_PQ);
@@ -109,15 +109,15 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试无效的索引类型")
+    @DisplayName("Test invalid index type")
     void testInvalidIndexType() {
         assertThatThrownBy(() -> IndexType.fromValue("INVALID"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("不支持的索引类型");
+                .hasMessageContaining("Unsupported index type");
     }
 
     @Test
-    @DisplayName("测试距离度量类型枚举")
+    @DisplayName("Test metric type enum")
     void testMetricTypeEnum() {
         assertThat(MetricType.fromValue("L2")).isEqualTo(MetricType.L2);
         assertThat(MetricType.fromValue("l2")).isEqualTo(MetricType.L2);
@@ -132,37 +132,37 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试无效的距离度量类型")
+    @DisplayName("Test invalid metric type")
     void testInvalidMetricType() {
         assertThatThrownBy(() -> MetricType.fromValue("INVALID"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("不支持的距离度量类型");
+                .hasMessageContaining("Unsupported metric type");
     }
 
     @Test
-    @DisplayName("测试缺少数据集路径时抛出异常")
+    @DisplayName("Test exception when missing dataset path")
     void testMissingDatasetPath() {
         assertThatThrownBy(() -> LanceIndexBuilder.builder()
                 .columnName("embedding")
                 .indexType(IndexType.IVF_PQ)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("数据集路径不能为空");
+                .hasMessageContaining("Dataset path cannot be empty");
     }
 
     @Test
-    @DisplayName("测试缺少列名时抛出异常")
+    @DisplayName("Test exception when missing column name")
     void testMissingColumnName() {
         assertThatThrownBy(() -> LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
                 .indexType(IndexType.IVF_PQ)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("列名不能为空");
+                .hasMessageContaining("Column name cannot be empty");
     }
 
     @Test
-    @DisplayName("测试无效的分区数")
+    @DisplayName("Test invalid number of partitions")
     void testInvalidNumPartitions() {
         assertThatThrownBy(() -> LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -170,11 +170,11 @@ class LanceIndexBuilderTest {
                 .numPartitions(0)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("分区数必须大于 0");
+                .hasMessageContaining("Number of partitions must be greater than 0");
     }
 
     @Test
-    @DisplayName("测试无效的子向量数")
+    @DisplayName("Test invalid number of sub-vectors")
     void testInvalidNumSubVectors() {
         assertThatThrownBy(() -> LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -182,11 +182,11 @@ class LanceIndexBuilderTest {
                 .numSubVectors(-1)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("子向量数必须大于 0");
+                .hasMessageContaining("Number of sub-vectors must be greater than 0");
     }
 
     @Test
-    @DisplayName("测试无效的量化位数")
+    @DisplayName("Test invalid number of quantization bits")
     void testInvalidNumBits() {
         assertThatThrownBy(() -> LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -194,7 +194,7 @@ class LanceIndexBuilderTest {
                 .numBits(0)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("量化位数必须在 1-16 之间");
+                .hasMessageContaining("Quantization bits must be between 1 and 16");
 
         assertThatThrownBy(() -> LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)
@@ -202,18 +202,18 @@ class LanceIndexBuilderTest {
                 .numBits(17)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("量化位数必须在 1-16 之间");
+                .hasMessageContaining("Quantization bits must be between 1 and 16");
     }
 
     @Test
-    @DisplayName("测试默认索引配置值")
+    @DisplayName("Test default index configuration values")
     void testDefaultIndexConfiguration() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
                 .indexColumn("embedding")
                 .build();
 
-        // 验证默认值
+        // Verify default values
         assertThat(options.getIndexType()).isEqualTo(IndexType.IVF_PQ);
         assertThat(options.getIndexNumPartitions()).isEqualTo(256);
         assertThat(options.getIndexNumBits()).isEqualTo(8);
@@ -223,7 +223,7 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试从 LanceOptions 创建索引构建器")
+    @DisplayName("Test creating index builder from LanceOptions")
     void testFromOptions() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
@@ -239,7 +239,7 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试索引构建结果")
+    @DisplayName("Test index build result")
     void testIndexBuildResult() {
         LanceIndexBuilder.IndexBuildResult result = new LanceIndexBuilder.IndexBuildResult(
                 true,
@@ -259,7 +259,7 @@ class LanceIndexBuilderTest {
     }
 
     @Test
-    @DisplayName("测试索引构建失败结果")
+    @DisplayName("Test index build failure result")
     void testIndexBuildFailureResult() {
         LanceIndexBuilder.IndexBuildResult result = new LanceIndexBuilder.IndexBuildResult(
                 false,
@@ -267,15 +267,15 @@ class LanceIndexBuilderTest {
                 "embedding",
                 datasetPath,
                 500,
-                "列不存在"
+                "Column does not exist"
         );
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getErrorMessage()).isEqualTo("列不存在");
+        assertThat(result.getErrorMessage()).isEqualTo("Column does not exist");
     }
 
     @Test
-    @DisplayName("测试替换索引选项")
+    @DisplayName("Test replace index option")
     void testReplaceIndexOption() {
         LanceIndexBuilder builder = LanceIndexBuilder.builder()
                 .datasetPath(datasetPath)

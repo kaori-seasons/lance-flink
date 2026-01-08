@@ -71,12 +71,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Lance Catalog 实现。
+ * Lance Catalog implementation.
  * 
- * <p>实现 Flink Catalog 接口，支持管理 Lance 数据集作为 Flink 表。
- * 支持本地文件系统和 S3 协议的对象存储。
+ * <p>Implements Flink Catalog interface, supports managing Lance datasets as Flink tables.
+ * Supports local file system and S3 protocol object storage.
  * 
- * <p>使用示例（本地路径）：
+ * <p>Usage example (local path):
  * <pre>{@code
  * CREATE CATALOG lance_catalog WITH (
  *     'type' = 'lance',
@@ -85,7 +85,7 @@ import java.util.stream.Collectors;
  * );
  * }</pre>
  * 
- * <p>使用示例（S3 路径）：
+ * <p>Usage example (S3 path):
  * <pre>{@code
  * CREATE CATALOG lance_s3_catalog WITH (
  *     'type' = 'lance',
@@ -108,28 +108,28 @@ public class LanceCatalog extends AbstractCatalog {
     private final boolean isRemoteStorage;
     private transient BufferAllocator allocator;
     
-    // 用于远程存储时缓存已知的数据库和表
+    // Cache known databases and tables for remote storage
     private final Set<String> knownDatabases = ConcurrentHashMap.newKeySet();
     private final Set<String> knownTables = ConcurrentHashMap.newKeySet();
 
     /**
-     * 创建 LanceCatalog（本地存储）
+     * Create LanceCatalog (local storage)
      *
-     * @param name Catalog 名称
-     * @param defaultDatabase 默认数据库名称
-     * @param warehouse 仓库路径
+     * @param name Catalog name
+     * @param defaultDatabase Default database name
+     * @param warehouse Warehouse path
      */
     public LanceCatalog(String name, String defaultDatabase, String warehouse) {
         this(name, defaultDatabase, warehouse, Collections.emptyMap());
     }
 
     /**
-     * 创建 LanceCatalog（支持远程存储）
+     * Create LanceCatalog (supports remote storage)
      *
-     * @param name Catalog 名称
-     * @param defaultDatabase 默认数据库名称
-     * @param warehouse 仓库路径（本地路径或 S3 URI）
-     * @param storageOptions 存储配置选项（如 S3 凭证）
+     * @param name Catalog name
+     * @param defaultDatabase Default database name
+     * @param warehouse Warehouse path (local path or S3 URI)
+     * @param storageOptions Storage configuration options (e.g., S3 credentials)
      */
     public LanceCatalog(String name, String defaultDatabase, String warehouse, Map<String, String> storageOptions) {
         super(name, defaultDatabase);
@@ -139,7 +139,7 @@ public class LanceCatalog extends AbstractCatalog {
     }
 
     /**
-     * 判断是否是远程存储路径
+     * Check if path is remote storage path
      */
     private boolean isRemotePath(String path) {
         if (path == null) {
@@ -155,13 +155,13 @@ public class LanceCatalog extends AbstractCatalog {
     }
 
     /**
-     * 标准化仓库路径
+     * Normalize warehouse path
      */
     private String normalizeWarehousePath(String path) {
         if (path == null) {
             return null;
         }
-        // 移除末尾的斜杠
+        // Remove trailing slashes
         while (path.endsWith("/") && path.length() > 1) {
             path = path.substring(0, path.length() - 1);
         }
@@ -170,32 +170,32 @@ public class LanceCatalog extends AbstractCatalog {
 
     @Override
     public void open() throws CatalogException {
-        LOG.info("打开 Lance Catalog: {}, 仓库路径: {}, 远程存储: {}", getName(), warehouse, isRemoteStorage);
+        LOG.info("Opening Lance Catalog: {}, warehouse path: {}, remote storage: {}", getName(), warehouse, isRemoteStorage);
         
         this.allocator = new RootAllocator(Long.MAX_VALUE);
         
         if (isRemoteStorage) {
-            // 远程存储：初始化默认数据库记录
+            // Remote storage: initialize default database record
             knownDatabases.add(getDefaultDatabase());
-            LOG.info("远程存储模式已启用，存储配置项数量: {}", storageOptions.size());
+            LOG.info("Remote storage mode enabled, storage config count: {}", storageOptions.size());
         } else {
-            // 本地存储：确保仓库目录存在
+            // Local storage: ensure warehouse directory exists
             Path warehousePath = Paths.get(warehouse);
             if (!Files.exists(warehousePath)) {
                 try {
                     Files.createDirectories(warehousePath);
                 } catch (IOException e) {
-                    throw new CatalogException("无法创建仓库目录: " + warehouse, e);
+                    throw new CatalogException("Cannot create warehouse directory: " + warehouse, e);
                 }
             }
             
-            // 确保默认数据库存在
+            // Ensure default database exists
             Path defaultDbPath = warehousePath.resolve(getDefaultDatabase());
             if (!Files.exists(defaultDbPath)) {
                 try {
                     Files.createDirectories(defaultDbPath);
                 } catch (IOException e) {
-                    throw new CatalogException("无法创建默认数据库目录: " + defaultDbPath, e);
+                    throw new CatalogException("Cannot create default database directory: " + defaultDbPath, e);
                 }
             }
         }
@@ -203,13 +203,13 @@ public class LanceCatalog extends AbstractCatalog {
 
     @Override
     public void close() throws CatalogException {
-        LOG.info("关闭 Lance Catalog: {}", getName());
+        LOG.info("Closing Lance Catalog: {}", getName());
         
         if (allocator != null) {
             try {
                 allocator.close();
             } catch (Exception e) {
-                LOG.warn("关闭分配器失败", e);
+                LOG.warn("Failed to close allocator", e);
             }
             allocator = null;
         }
@@ -218,12 +218,12 @@ public class LanceCatalog extends AbstractCatalog {
         knownTables.clear();
     }
 
-    // ==================== Database 操作 ====================
+    // ==================== Database Operations ====================
 
     @Override
     public List<String> listDatabases() throws CatalogException {
         if (isRemoteStorage) {
-            // 远程存储：返回已知数据库列表
+            // Remote storage: return known database list
             return new ArrayList<>(knownDatabases);
         }
         
@@ -238,7 +238,7 @@ public class LanceCatalog extends AbstractCatalog {
                     .map(path -> path.getFileName().toString())
                     .collect(Collectors.toList());
         } catch (IOException e) {
-            throw new CatalogException("列举数据库失败", e);
+            throw new CatalogException("Failed to list databases", e);
         }
     }
 
@@ -254,14 +254,14 @@ public class LanceCatalog extends AbstractCatalog {
     @Override
     public boolean databaseExists(String databaseName) throws CatalogException {
         if (isRemoteStorage) {
-            // 远程存储：检查已知数据库或尝试列出表来验证
+            // Remote storage: check known databases or try listing tables to verify
             if (knownDatabases.contains(databaseName)) {
                 return true;
             }
-            // 尝试通过检查是否有表来确认数据库存在
+            // Try to confirm database exists by checking for tables
             try {
                 String dbPath = getDatabasePath(databaseName);
-                // 对于远程存储，我们假设数据库总是存在（实际表操作时会验证）
+                // For remote storage, assume database always exists (actual table operations will verify)
                 return true;
             } catch (Exception e) {
                 return false;
@@ -276,7 +276,7 @@ public class LanceCatalog extends AbstractCatalog {
     public void createDatabase(String name, CatalogDatabase database, boolean ignoreIfExists)
             throws DatabaseAlreadyExistException, CatalogException {
         if (isRemoteStorage) {
-            // 远程存储：只记录数据库名称，实际目录在创建表时自动创建
+            // Remote storage: only record database name, actual directory created when creating table
             if (knownDatabases.contains(name)) {
                 if (!ignoreIfExists) {
                     throw new DatabaseAlreadyExistException(getName(), name);
@@ -284,7 +284,7 @@ public class LanceCatalog extends AbstractCatalog {
                 return;
             }
             knownDatabases.add(name);
-            LOG.info("注册远程数据库: {}", name);
+            LOG.info("Registered remote database: {}", name);
             return;
         }
         
@@ -298,9 +298,9 @@ public class LanceCatalog extends AbstractCatalog {
         Path dbPath = Paths.get(warehouse, name);
         try {
             Files.createDirectories(dbPath);
-            LOG.info("创建数据库: {}", name);
+            LOG.info("Created database: {}", name);
         } catch (IOException e) {
-            throw new CatalogException("创建数据库失败: " + name, e);
+            throw new CatalogException("Failed to create database: " + name, e);
         }
     }
 
@@ -308,7 +308,7 @@ public class LanceCatalog extends AbstractCatalog {
     public void dropDatabase(String name, boolean ignoreIfNotExists, boolean cascade)
             throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
         if (isRemoteStorage) {
-            // 远程存储：移除数据库记录
+            // Remote storage: remove database record
             if (!knownDatabases.contains(name)) {
                 if (!ignoreIfNotExists) {
                     throw new DatabaseNotExistException(getName(), name);
@@ -316,25 +316,25 @@ public class LanceCatalog extends AbstractCatalog {
                 return;
             }
             
-            // 检查是否有表
+            // Check if has tables
             List<String> tables = listTables(name);
             if (!tables.isEmpty() && !cascade) {
                 throw new DatabaseNotEmptyException(getName(), name);
             }
             
-            // 如果 cascade，删除所有表
+            // If cascade, delete all tables
             if (cascade) {
                 for (String table : tables) {
                     try {
                         dropTable(new ObjectPath(name, table), true);
                     } catch (TableNotExistException e) {
-                        // 忽略
+                        // Ignore
                     }
                 }
             }
             
             knownDatabases.remove(name);
-            LOG.info("移除远程数据库记录: {}", name);
+            LOG.info("Removed remote database record: {}", name);
             return;
         }
         
@@ -352,11 +352,11 @@ public class LanceCatalog extends AbstractCatalog {
                 throw new DatabaseNotEmptyException(getName(), name);
             }
             
-            // 删除数据库目录
+            // Delete database directory
             deleteDirectory(dbPath);
-            LOG.info("删除数据库: {}", name);
+            LOG.info("Deleted database: {}", name);
         } catch (IOException e) {
-            throw new CatalogException("删除数据库失败: " + name, e);
+            throw new CatalogException("Failed to delete database: " + name, e);
         }
     }
 
@@ -369,11 +369,11 @@ public class LanceCatalog extends AbstractCatalog {
             }
             return;
         }
-        // Lance 数据库不支持修改属性
-        LOG.warn("Lance Catalog 不支持修改数据库属性");
+        // Lance database does not support modifying properties
+        LOG.warn("Lance Catalog does not support modifying database properties");
     }
 
-    // ==================== Table 操作 ====================
+    // ==================== Table Operations ====================
 
     @Override
     public List<String> listTables(String databaseName) throws DatabaseNotExistException, CatalogException {
@@ -382,7 +382,7 @@ public class LanceCatalog extends AbstractCatalog {
         }
         
         if (isRemoteStorage) {
-            // 远程存储：返回已知表列表
+            // Remote storage: return known table list
             String prefix = databaseName + "/";
             return knownTables.stream()
                     .filter(t -> t.startsWith(prefix))
@@ -394,17 +394,17 @@ public class LanceCatalog extends AbstractCatalog {
             Path dbPath = Paths.get(warehouse, databaseName);
             return Files.list(dbPath)
                     .filter(Files::isDirectory)
-                    .filter(path -> Files.exists(path.resolve("_versions"))) // Lance 数据集标识
+                    .filter(path -> Files.exists(path.resolve("_versions"))) // Lance dataset identifier
                     .map(path -> path.getFileName().toString())
                     .collect(Collectors.toList());
         } catch (IOException e) {
-            throw new CatalogException("列举表失败", e);
+            throw new CatalogException("Failed to list tables", e);
         }
     }
 
     @Override
     public List<String> listViews(String databaseName) throws DatabaseNotExistException, CatalogException {
-        // Lance 不支持视图
+        // Lance does not support views
         return Collections.emptyList();
     }
 
@@ -417,18 +417,18 @@ public class LanceCatalog extends AbstractCatalog {
         String datasetPath = getDatasetPath(tablePath);
         
         try {
-            // 对于远程存储，通过环境变量配置 S3 凭证
+            // For remote storage, configure S3 credentials via environment variables
             if (isRemoteStorage) {
                 configureStorageEnvironment();
             }
             Dataset dataset = Dataset.open(datasetPath, allocator);
             
             try {
-                // 从 Lance Schema 推断 Flink Schema
+                // Infer Flink Schema from Lance Schema
                 org.apache.arrow.vector.types.pojo.Schema arrowSchema = dataset.getSchema();
                 RowType rowType = LanceTypeConverter.toFlinkRowType(arrowSchema);
                 
-                // 构建 CatalogTable
+                // Build CatalogTable
                 Schema.Builder schemaBuilder = Schema.newBuilder();
                 for (RowType.RowField field : rowType.getFields()) {
                     DataType dataType = LanceTypeConverter.toDataType(field.getType());
@@ -439,7 +439,7 @@ public class LanceCatalog extends AbstractCatalog {
                 options.put("connector", LanceDynamicTableFactory.IDENTIFIER);
                 options.put("path", datasetPath);
                 
-                // 如果是远程存储，添加存储配置到表选项
+                // If remote storage, add storage config to table options
                 if (isRemoteStorage) {
                     options.putAll(getStorageOptionsForTable());
                 }
@@ -454,7 +454,7 @@ public class LanceCatalog extends AbstractCatalog {
                 dataset.close();
             }
         } catch (Exception e) {
-            throw new CatalogException("获取表信息失败: " + tablePath, e);
+            throw new CatalogException("Failed to get table info: " + tablePath, e);
         }
     }
 
@@ -467,13 +467,13 @@ public class LanceCatalog extends AbstractCatalog {
         String datasetPath = getDatasetPath(tablePath);
         
         if (isRemoteStorage) {
-            // 远程存储：检查已知表或尝试打开数据集
+            // Remote storage: check known tables or try opening dataset
             String tableKey = tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
             if (knownTables.contains(tableKey)) {
                 return true;
             }
             
-            // 尝试打开数据集来验证是否存在
+            // Try to open dataset to verify existence
             try {
                 configureStorageEnvironment();
                 Dataset dataset = Dataset.open(datasetPath, allocator);
@@ -481,14 +481,14 @@ public class LanceCatalog extends AbstractCatalog {
                 knownTables.add(tableKey);
                 return true;
             } catch (Exception e) {
-                LOG.debug("表不存在或无法访问: {}", datasetPath, e);
+                LOG.debug("Table does not exist or cannot be accessed: {}", datasetPath, e);
                 return false;
             }
         }
         
         Path path = Paths.get(datasetPath);
         
-        // 检查是否是有效的 Lance 数据集
+        // Check if valid Lance dataset
         return Files.exists(path) && Files.isDirectory(path) && 
                Files.exists(path.resolve("_versions"));
     }
@@ -506,19 +506,19 @@ public class LanceCatalog extends AbstractCatalog {
         String datasetPath = getDatasetPath(tablePath);
         
         if (isRemoteStorage) {
-            // 远程存储：目前 Lance Java SDK 不直接支持删除远程数据集
-            // 这里只移除记录，实际删除需要使用云存储 API
+            // Remote storage: Lance Java SDK does not directly support deleting remote datasets
+            // Only remove record here, actual deletion requires cloud storage API
             String tableKey = tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
             knownTables.remove(tableKey);
-            LOG.warn("远程存储模式下，表记录已移除，但实际数据需要手动从存储中删除: {}", datasetPath);
+            LOG.warn("Remote storage mode, table record removed, but actual data needs manual deletion from storage: {}", datasetPath);
             return;
         }
         
         try {
             deleteDirectory(Paths.get(datasetPath));
-            LOG.info("删除表: {}", tablePath);
+            LOG.info("Deleted table: {}", tablePath);
         } catch (IOException e) {
-            throw new CatalogException("删除表失败: " + tablePath, e);
+            throw new CatalogException("Failed to delete table: " + tablePath, e);
         }
     }
 
@@ -538,8 +538,8 @@ public class LanceCatalog extends AbstractCatalog {
         }
         
         if (isRemoteStorage) {
-            // 远程存储：不支持重命名
-            throw new CatalogException("远程存储模式下不支持重命名表");
+            // Remote storage: does not support renaming
+            throw new CatalogException("Remote storage mode does not support renaming tables");
         }
         
         String oldPath = getDatasetPath(tablePath);
@@ -547,9 +547,9 @@ public class LanceCatalog extends AbstractCatalog {
         
         try {
             Files.move(Paths.get(oldPath), Paths.get(newPath));
-            LOG.info("重命名表: {} -> {}", tablePath, newTablePath);
+            LOG.info("Renamed table: {} -> {}", tablePath, newTablePath);
         } catch (IOException e) {
-            throw new CatalogException("重命名表失败: " + tablePath, e);
+            throw new CatalogException("Failed to rename table: " + tablePath, e);
         }
     }
 
@@ -568,14 +568,14 @@ public class LanceCatalog extends AbstractCatalog {
         }
         
         if (isRemoteStorage) {
-            // 远程存储：记录表信息，实际创建在写入时完成
+            // Remote storage: record table info, actual creation on write
             String tableKey = tablePath.getDatabaseName() + "/" + tablePath.getObjectName();
             knownTables.add(tableKey);
         }
         
-        // 表的实际创建在第一次写入时完成
-        // 这里只记录表的元数据
-        LOG.info("注册表: {}（实际数据集将在写入时创建）", tablePath);
+        // Actual table creation happens on first write
+        // Only record table metadata here
+        LOG.info("Registered table: {} (actual dataset will be created on write)", tablePath);
     }
 
     @Override
@@ -588,11 +588,11 @@ public class LanceCatalog extends AbstractCatalog {
             return;
         }
         
-        // Lance 不支持修改表结构
-        throw new CatalogException("Lance Catalog 不支持修改表结构");
+        // Lance does not support modifying table structure
+        throw new CatalogException("Lance Catalog does not support altering table structure");
     }
 
-    // ==================== 分区操作（Lance 不支持分区）====================
+    // ==================== Partition Operations (Lance does not support partitions) ====================
 
     @Override
     public List<CatalogPartitionSpec> listPartitions(ObjectPath tablePath)
@@ -627,22 +627,22 @@ public class LanceCatalog extends AbstractCatalog {
     @Override
     public void createPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec, CatalogPartition partition, boolean ignoreIfExists)
             throws TableNotExistException, TableNotPartitionedException, PartitionSpecInvalidException, PartitionAlreadyExistsException, CatalogException {
-        throw new CatalogException("Lance Catalog 不支持分区操作");
+        throw new CatalogException("Lance Catalog does not support partition operations");
     }
 
     @Override
     public void dropPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec, boolean ignoreIfNotExists)
             throws PartitionNotExistException, CatalogException {
-        throw new CatalogException("Lance Catalog 不支持分区操作");
+        throw new CatalogException("Lance Catalog does not support partition operations");
     }
 
     @Override
     public void alterPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec, CatalogPartition newPartition, boolean ignoreIfNotExists)
             throws PartitionNotExistException, CatalogException {
-        throw new CatalogException("Lance Catalog 不支持分区操作");
+        throw new CatalogException("Lance Catalog does not support partition operations");
     }
 
-    // ==================== 函数操作（Lance 不支持用户自定义函数）====================
+    // ==================== Function Operations (Lance does not support UDFs) ====================
 
     @Override
     public List<String> listFunctions(String dbName) throws DatabaseNotExistException, CatalogException {
@@ -662,22 +662,22 @@ public class LanceCatalog extends AbstractCatalog {
     @Override
     public void createFunction(ObjectPath functionPath, CatalogFunction function, boolean ignoreIfExists)
             throws FunctionAlreadyExistException, DatabaseNotExistException, CatalogException {
-        throw new CatalogException("Lance Catalog 不支持用户自定义函数");
+        throw new CatalogException("Lance Catalog does not support user-defined functions");
     }
 
     @Override
     public void alterFunction(ObjectPath functionPath, CatalogFunction newFunction, boolean ignoreIfNotExists)
             throws FunctionNotExistException, CatalogException {
-        throw new CatalogException("Lance Catalog 不支持用户自定义函数");
+        throw new CatalogException("Lance Catalog does not support user-defined functions");
     }
 
     @Override
     public void dropFunction(ObjectPath functionPath, boolean ignoreIfNotExists)
             throws FunctionNotExistException, CatalogException {
-        throw new CatalogException("Lance Catalog 不支持用户自定义函数");
+        throw new CatalogException("Lance Catalog does not support user-defined functions");
     }
 
-    // ==================== 统计信息操作 ====================
+    // ==================== Statistics Operations ====================
 
     @Override
     public CatalogTableStatistics getTableStatistics(ObjectPath tablePath)
@@ -706,38 +706,38 @@ public class LanceCatalog extends AbstractCatalog {
     @Override
     public void alterTableStatistics(ObjectPath tablePath, CatalogTableStatistics tableStatistics, boolean ignoreIfNotExists)
             throws TableNotExistException, CatalogException {
-        // 不支持
+        // Not supported
     }
 
     @Override
     public void alterTableColumnStatistics(ObjectPath tablePath, CatalogColumnStatistics columnStatistics, boolean ignoreIfNotExists)
             throws TableNotExistException, CatalogException {
-        // 不支持
+        // Not supported
     }
 
     @Override
     public void alterPartitionStatistics(ObjectPath tablePath, CatalogPartitionSpec partitionSpec, CatalogTableStatistics partitionStatistics, boolean ignoreIfNotExists)
             throws PartitionNotExistException, CatalogException {
-        // 不支持
+        // Not supported
     }
 
     @Override
     public void alterPartitionColumnStatistics(ObjectPath tablePath, CatalogPartitionSpec partitionSpec, CatalogColumnStatistics columnStatistics, boolean ignoreIfNotExists)
             throws PartitionNotExistException, CatalogException {
-        // 不支持
+        // Not supported
     }
 
-    // ==================== 工具方法 ====================
+    // ==================== Utility Methods ====================
 
     /**
-     * 配置存储环境变量（用于 S3 等远程存储）
+     * Configure storage environment variables (for S3 and other remote storage)
      * 
-     * <p>Lance 通过环境变量配置 S3 凭证：
+     * <p>Lance configures S3 credentials via environment variables:
      * <ul>
-     *   <li>AWS_ACCESS_KEY_ID - AWS 访问密钥 ID</li>
-     *   <li>AWS_SECRET_ACCESS_KEY - AWS 秘密访问密钥</li>
-     *   <li>AWS_DEFAULT_REGION - AWS 区域</li>
-     *   <li>AWS_ENDPOINT - 自定义端点 URL（用于兼容 S3 的存储）</li>
+     *   <li>AWS_ACCESS_KEY_ID - AWS access key ID</li>
+     *   <li>AWS_SECRET_ACCESS_KEY - AWS secret access key</li>
+     *   <li>AWS_DEFAULT_REGION - AWS region</li>
+     *   <li>AWS_ENDPOINT - Custom endpoint URL (for S3-compatible storage)</li>
      * </ul>
      */
     private void configureStorageEnvironment() {
@@ -745,9 +745,9 @@ public class LanceCatalog extends AbstractCatalog {
             return;
         }
         
-        // 设置环境变量用于 Lance SDK 的 object_store 配置
-        // 注意：由于 Java 不能直接修改环境变量，这里使用系统属性作为备选方案
-        // Lance 的 Rust 底层会读取这些环境变量
+        // Set environment variables for Lance SDK object_store configuration
+        // Note: Since Java cannot directly modify environment variables, system properties are used as fallback
+        // Lance's Rust backend will read these environment variables
         
         if (storageOptions.containsKey("aws_access_key_id")) {
             System.setProperty("AWS_ACCESS_KEY_ID", storageOptions.get("aws_access_key_id"));
@@ -769,11 +769,11 @@ public class LanceCatalog extends AbstractCatalog {
             System.setProperty("AWS_ALLOW_HTTP", storageOptions.get("allow_http"));
         }
         
-        LOG.debug("已配置远程存储环境变量");
+        LOG.debug("Configured remote storage environment variables");
     }
 
     /**
-     * 获取数据库路径
+     * Get database path
      */
     private String getDatabasePath(String databaseName) {
         if (isRemoteStorage) {
@@ -783,7 +783,7 @@ public class LanceCatalog extends AbstractCatalog {
     }
 
     /**
-     * 获取数据集路径
+     * Get dataset path
      */
     private String getDatasetPath(ObjectPath tablePath) {
         if (isRemoteStorage) {
@@ -793,12 +793,12 @@ public class LanceCatalog extends AbstractCatalog {
     }
 
     /**
-     * 获取用于表配置的存储选项
+     * Get storage options for table configuration
      */
     private Map<String, String> getStorageOptionsForTable() {
         Map<String, String> options = new HashMap<>();
         
-        // 转换存储选项为表配置格式
+        // Convert storage options to table config format
         if (storageOptions.containsKey("aws_access_key_id")) {
             options.put("s3-access-key", storageOptions.get("aws_access_key_id"));
         }
@@ -816,7 +816,7 @@ public class LanceCatalog extends AbstractCatalog {
     }
 
     /**
-     * 递归删除目录
+     * Recursively delete directory
      */
     private void deleteDirectory(Path path) throws IOException {
         if (Files.isDirectory(path)) {
@@ -824,7 +824,7 @@ public class LanceCatalog extends AbstractCatalog {
                 try {
                     deleteDirectory(child);
                 } catch (IOException e) {
-                    LOG.warn("删除文件失败: {}", child, e);
+                    LOG.warn("Failed to delete file: {}", child, e);
                 }
             });
         }
@@ -832,21 +832,21 @@ public class LanceCatalog extends AbstractCatalog {
     }
 
     /**
-     * 获取仓库路径
+     * Get warehouse path
      */
     public String getWarehouse() {
         return warehouse;
     }
 
     /**
-     * 获取存储配置选项
+     * Get storage configuration options
      */
     public Map<String, String> getStorageOptions() {
         return Collections.unmodifiableMap(storageOptions);
     }
 
     /**
-     * 是否为远程存储
+     * Whether is remote storage
      */
     public boolean isRemoteStorage() {
         return isRemoteStorage;

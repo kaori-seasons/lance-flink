@@ -28,19 +28,19 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * AggregateInfo 单元测试
+ * AggregateInfo unit tests
  */
-@DisplayName("AggregateInfo 单元测试")
+@DisplayName("AggregateInfo Unit Tests")
 class AggregateInfoTest {
 
-    // ==================== AggregateCall 测试 ====================
+    // ==================== AggregateCall Tests ====================
     
     @Nested
-    @DisplayName("AggregateCall 测试")
+    @DisplayName("AggregateCall Tests")
     class AggregateCallTests {
 
         @Test
-        @DisplayName("COUNT(*) 应该正确识别")
+        @DisplayName("COUNT(*) should be correctly identified")
         void testCountStar() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.COUNT, null, "cnt");
@@ -53,7 +53,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("COUNT(column) 应该正确识别")
+        @DisplayName("COUNT(column) should be correctly identified")
         void testCountColumn() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.COUNT, "id", "id_count");
@@ -66,7 +66,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("SUM 聚合应该正确构建")
+        @DisplayName("SUM aggregate should be correctly built")
         void testSumAggregate() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.SUM, "amount", "total_amount");
@@ -79,7 +79,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("AVG 聚合应该正确构建")
+        @DisplayName("AVG aggregate should be correctly built")
         void testAvgAggregate() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.AVG, "score", "avg_score");
@@ -91,7 +91,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("MIN 聚合应该正确构建")
+        @DisplayName("MIN aggregate should be correctly built")
         void testMinAggregate() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.MIN, "price", "min_price");
@@ -102,7 +102,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("MAX 聚合应该正确构建")
+        @DisplayName("MAX aggregate should be correctly built")
         void testMaxAggregate() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.MAX, "price", "max_price");
@@ -113,7 +113,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("AggregateCall equals 和 hashCode 应该正确工作")
+        @DisplayName("AggregateCall equals and hashCode should work correctly")
         void testAggregateCallEqualsAndHashCode() {
             AggregateInfo.AggregateCall call1 = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.SUM, "amount", "total");
@@ -128,14 +128,14 @@ class AggregateInfoTest {
         }
     }
 
-    // ==================== AggregateInfo Builder 测试 ====================
+    // ==================== AggregateInfo Builder Tests ====================
     
     @Nested
-    @DisplayName("AggregateInfo Builder 测试")
+    @DisplayName("AggregateInfo Builder Tests")
     class AggregateInfoBuilderTests {
 
         @Test
-        @DisplayName("构建简单 COUNT(*) 查询")
+        @DisplayName("Build simple COUNT(*) query")
         void testBuildSimpleCountStar() {
             AggregateInfo info = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -148,7 +148,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("构建带分组的聚合查询")
+        @DisplayName("Build aggregate query with GROUP BY")
         void testBuildAggregateWithGroupBy() {
             AggregateInfo info = AggregateInfo.builder()
                     .addSum("amount", "total_amount")
@@ -164,7 +164,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("构建多聚合函数查询")
+        @DisplayName("Build multiple aggregates query")
         void testBuildMultipleAggregates() {
             AggregateInfo info = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -180,7 +180,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("构建时至少需要一个聚合函数")
+        @DisplayName("Build requires at least one aggregate function")
         void testBuildRequiresAtLeastOneAggregate() {
             assertThrows(IllegalArgumentException.class, () -> {
                 AggregateInfo.builder().build();
@@ -188,7 +188,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("addAggregateCall 应该正确工作")
+        @DisplayName("addAggregateCall should work correctly")
         void testAddAggregateCall() {
             AggregateInfo.AggregateCall call = new AggregateInfo.AggregateCall(
                     AggregateInfo.AggregateFunction.SUM, "amount", "total");
@@ -202,7 +202,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("addCount 应该正确工作")
+        @DisplayName("addCount should work correctly")
         void testAddCount() {
             AggregateInfo info = AggregateInfo.builder()
                     .addCount("id", "id_count")
@@ -215,7 +215,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("groupBy(List) 应该正确工作")
+        @DisplayName("groupBy(List) should work correctly")
         void testGroupByWithList() {
             List<String> groupCols = Arrays.asList("col1", "col2", "col3");
             
@@ -228,7 +228,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("groupByFieldIndices 应该正确设置")
+        @DisplayName("groupByFieldIndices should be correctly set")
         void testGroupByFieldIndices() {
             int[] indices = {0, 2, 4};
             
@@ -242,14 +242,14 @@ class AggregateInfoTest {
         }
     }
 
-    // ==================== AggregateInfo 方法测试 ====================
+    // ==================== AggregateInfo Methods Tests ====================
     
     @Nested
-    @DisplayName("AggregateInfo 方法测试")
+    @DisplayName("AggregateInfo Methods Tests")
     class AggregateInfoMethodTests {
 
         @Test
-        @DisplayName("getRequiredColumns 应该返回所有需要的列")
+        @DisplayName("getRequiredColumns should return all required columns")
         void testGetRequiredColumns() {
             AggregateInfo info = AggregateInfo.builder()
                     .addSum("amount", "sum_amount")
@@ -259,7 +259,7 @@ class AggregateInfoTest {
             
             List<String> required = info.getRequiredColumns();
             
-            // 应该包含分组列和聚合列
+            // Should contain group columns and aggregate columns
             assertTrue(required.contains("category"));
             assertTrue(required.contains("region"));
             assertTrue(required.contains("amount"));
@@ -267,23 +267,23 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("getRequiredColumns 应该去重")
+        @DisplayName("getRequiredColumns should deduplicate")
         void testGetRequiredColumnsDedup() {
             AggregateInfo info = AggregateInfo.builder()
                     .addSum("amount", "sum_amount")
-                    .addAvg("amount", "avg_amount")  // 同一列
+                    .addAvg("amount", "avg_amount")  // Same column
                     .groupBy("category")
                     .build();
             
             List<String> required = info.getRequiredColumns();
             
-            // amount 应该只出现一次
+            // amount should appear only once
             long amountCount = required.stream().filter(c -> c.equals("amount")).count();
             assertEquals(1, amountCount);
         }
 
         @Test
-        @DisplayName("COUNT(*) 不需要列")
+        @DisplayName("COUNT(*) does not require column")
         void testCountStarNoColumn() {
             AggregateInfo info = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -294,7 +294,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("equals 和 hashCode 应该正确工作")
+        @DisplayName("equals and hashCode should work correctly")
         void testEqualsAndHashCode() {
             AggregateInfo info1 = AggregateInfo.builder()
                     .addSum("amount", "total")
@@ -317,7 +317,7 @@ class AggregateInfoTest {
         }
 
         @Test
-        @DisplayName("toString 应该返回有意义的字符串")
+        @DisplayName("toString should return meaningful string")
         void testToString() {
             AggregateInfo info = AggregateInfo.builder()
                     .addSum("amount", "total")
@@ -333,14 +333,14 @@ class AggregateInfoTest {
         }
     }
 
-    // ==================== 聚合函数枚举测试 ====================
+    // ==================== Aggregate Function Enum Tests ====================
     
     @Nested
-    @DisplayName("AggregateFunction 枚举测试")
+    @DisplayName("AggregateFunction Enum Tests")
     class AggregateFunctionEnumTests {
 
         @Test
-        @DisplayName("应该包含所有支持的聚合函数")
+        @DisplayName("Should contain all supported aggregate functions")
         void testAllAggregateFunctions() {
             AggregateInfo.AggregateFunction[] functions = AggregateInfo.AggregateFunction.values();
             

@@ -38,16 +38,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * AggregateExecutor 单元测试
+ * AggregateExecutor unit tests
  */
-@DisplayName("AggregateExecutor 单元测试")
+@DisplayName("AggregateExecutor Unit Tests")
 class AggregateExecutorTest {
 
     private RowType sourceRowType;
 
     @BeforeEach
     void setUp() {
-        // 创建测试用的 RowType: (id INT, name VARCHAR, category VARCHAR, amount DOUBLE, quantity INT)
+        // Create test RowType: (id INT, name VARCHAR, category VARCHAR, amount DOUBLE, quantity INT)
         sourceRowType = RowType.of(
                 new IntType(),
                 new VarCharType(100),
@@ -65,7 +65,7 @@ class AggregateExecutorTest {
     }
 
     /**
-     * 创建测试数据行
+     * Create test data row
      */
     private RowData createRow(int id, String name, String category, double amount, int quantity) {
         GenericRowData row = new GenericRowData(5);
@@ -77,14 +77,14 @@ class AggregateExecutorTest {
         return row;
     }
 
-    // ==================== COUNT 聚合测试 ====================
+    // ==================== COUNT Aggregate Tests ====================
 
     @Nested
-    @DisplayName("COUNT 聚合测试")
+    @DisplayName("COUNT Aggregate Tests")
     class CountAggregateTests {
 
         @Test
-        @DisplayName("COUNT(*) 应该正确计数所有行")
+        @DisplayName("COUNT(*) should correctly count all rows")
         void testCountStar() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -93,7 +93,7 @@ class AggregateExecutorTest {
             AggregateExecutor executor = new AggregateExecutor(aggInfo, sourceRowType);
             executor.init();
             
-            // 累积 5 行数据
+            // Accumulate 5 rows of data
             executor.accumulate(createRow(1, "Alice", "A", 100.0, 10));
             executor.accumulate(createRow(2, "Bob", "B", 200.0, 20));
             executor.accumulate(createRow(3, "Charlie", "A", 150.0, 15));
@@ -107,7 +107,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("COUNT(column) 应该正确计数非空值")
+        @DisplayName("COUNT(column) should correctly count non-null values")
         void testCountColumn() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCount("name", "name_count")
@@ -127,7 +127,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("空数据集的 COUNT(*) 应该返回 0")
+        @DisplayName("COUNT(*) on empty dataset should return 0")
         void testCountStarEmpty() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -143,14 +143,14 @@ class AggregateExecutorTest {
         }
     }
 
-    // ==================== SUM 聚合测试 ====================
+    // ==================== SUM Aggregate Tests ====================
 
     @Nested
-    @DisplayName("SUM 聚合测试")
+    @DisplayName("SUM Aggregate Tests")
     class SumAggregateTests {
 
         @Test
-        @DisplayName("SUM 应该正确求和")
+        @DisplayName("SUM should correctly sum values")
         void testSum() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "total_amount")
@@ -170,7 +170,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("空数据集的 SUM 应该返回 null")
+        @DisplayName("SUM on empty dataset should return null")
         void testSumEmpty() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "total_amount")
@@ -186,14 +186,14 @@ class AggregateExecutorTest {
         }
     }
 
-    // ==================== AVG 聚合测试 ====================
+    // ==================== AVG Aggregate Tests ====================
 
     @Nested
-    @DisplayName("AVG 聚合测试")
+    @DisplayName("AVG Aggregate Tests")
     class AvgAggregateTests {
 
         @Test
-        @DisplayName("AVG 应该正确计算平均值")
+        @DisplayName("AVG should correctly calculate average")
         void testAvg() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addAvg("amount", "avg_amount")
@@ -213,7 +213,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("空数据集的 AVG 应该返回 null")
+        @DisplayName("AVG on empty dataset should return null")
         void testAvgEmpty() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addAvg("amount", "avg_amount")
@@ -229,14 +229,14 @@ class AggregateExecutorTest {
         }
     }
 
-    // ==================== MIN/MAX 聚合测试 ====================
+    // ==================== MIN/MAX Aggregate Tests ====================
 
     @Nested
-    @DisplayName("MIN/MAX 聚合测试")
+    @DisplayName("MIN/MAX Aggregate Tests")
     class MinMaxAggregateTests {
 
         @Test
-        @DisplayName("MIN 应该返回最小值")
+        @DisplayName("MIN should return minimum value")
         void testMin() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addMin("amount", "min_amount")
@@ -256,7 +256,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("MAX 应该返回最大值")
+        @DisplayName("MAX should return maximum value")
         void testMax() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addMax("amount", "max_amount")
@@ -276,7 +276,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("空数据集的 MIN/MAX 应该返回 null")
+        @DisplayName("MIN/MAX on empty dataset should return null")
         void testMinMaxEmpty() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addMin("amount", "min_amount")
@@ -294,14 +294,14 @@ class AggregateExecutorTest {
         }
     }
 
-    // ==================== GROUP BY 测试 ====================
+    // ==================== GROUP BY Tests ====================
 
     @Nested
-    @DisplayName("GROUP BY 聚合测试")
+    @DisplayName("GROUP BY Aggregate Tests")
     class GroupByAggregateTests {
 
         @Test
-        @DisplayName("带 GROUP BY 的 COUNT 应该按分组计数")
+        @DisplayName("COUNT with GROUP BY should count by group")
         void testGroupByCount() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -319,9 +319,9 @@ class AggregateExecutorTest {
             
             List<RowData> results = executor.getResults();
             
-            assertEquals(2, results.size());  // 2 个分组: A 和 B
+            assertEquals(2, results.size());  // 2 groups: A and B
             
-            // 验证每个分组的计数
+            // Verify count for each group
             long countA = 0, countB = 0;
             for (RowData row : results) {
                 String category = row.getString(0).toString();
@@ -332,12 +332,12 @@ class AggregateExecutorTest {
                     countB = count;
                 }
             }
-            assertEquals(3, countA);  // A 有 3 条
-            assertEquals(2, countB);  // B 有 2 条
+            assertEquals(3, countA);  // A has 3 rows
+            assertEquals(2, countB);  // B has 2 rows
         }
 
         @Test
-        @DisplayName("带 GROUP BY 的 SUM 应该按分组求和")
+        @DisplayName("SUM with GROUP BY should sum by group")
         void testGroupBySum() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "total_amount")
@@ -355,7 +355,7 @@ class AggregateExecutorTest {
             
             assertEquals(2, results.size());
             
-            // 验证每个分组的求和
+            // Verify sum for each group
             for (RowData row : results) {
                 String category = row.getString(0).toString();
                 double sum = row.getDouble(1);
@@ -368,7 +368,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("空数据集带 GROUP BY 应该返回空结果")
+        @DisplayName("Empty dataset with GROUP BY should return empty result")
         void testGroupByEmpty() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -384,14 +384,14 @@ class AggregateExecutorTest {
         }
     }
 
-    // ==================== 多聚合函数测试 ====================
+    // ==================== Multiple Aggregates Tests ====================
 
     @Nested
-    @DisplayName("多聚合函数测试")
+    @DisplayName("Multiple Aggregates Tests")
     class MultipleAggregatesTests {
 
         @Test
-        @DisplayName("多个聚合函数应该同时工作")
+        @DisplayName("Multiple aggregate functions should work together")
         void testMultipleAggregates() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -421,7 +421,7 @@ class AggregateExecutorTest {
         }
 
         @Test
-        @DisplayName("多聚合函数带 GROUP BY 应该正确工作")
+        @DisplayName("Multiple aggregates with GROUP BY should work correctly")
         void testMultipleAggregatesWithGroupBy() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -460,14 +460,14 @@ class AggregateExecutorTest {
         }
     }
 
-    // ==================== 重置测试 ====================
+    // ==================== Reset Tests ====================
 
     @Nested
-    @DisplayName("重置测试")
+    @DisplayName("Reset Tests")
     class ResetTests {
 
         @Test
-        @DisplayName("reset 应该清空聚合状态")
+        @DisplayName("reset should clear aggregate state")
         void testReset() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -479,28 +479,28 @@ class AggregateExecutorTest {
             executor.accumulate(createRow(1, "Alice", "A", 100.0, 10));
             executor.accumulate(createRow(2, "Bob", "B", 200.0, 20));
             
-            // 重置
+            // Reset
             executor.reset();
             
-            // 重新初始化并累积新数据
+            // Re-initialize and accumulate new data
             executor.init();
             executor.accumulate(createRow(3, "Charlie", "A", 150.0, 15));
             
             List<RowData> results = executor.getResults();
             
             assertEquals(1, results.size());
-            assertEquals(1L, results.get(0).getLong(0));  // 只有重置后的 1 条
+            assertEquals(1L, results.get(0).getLong(0));  // Only 1 row after reset
         }
     }
 
-    // ==================== 结果类型测试 ====================
+    // ==================== Result Type Tests ====================
 
     @Nested
-    @DisplayName("结果类型测试")
+    @DisplayName("Result Type Tests")
     class ResultTypeTests {
 
         @Test
-        @DisplayName("buildResultRowType 应该返回正确的结果类型")
+        @DisplayName("buildResultRowType should return correct result type")
         void testBuildResultRowType() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -516,14 +516,14 @@ class AggregateExecutorTest {
             assertNotNull(resultType);
             assertEquals(3, resultType.getFieldCount());
             
-            // 第一个字段是分组列 category
+            // First field is group column category
             assertEquals("category", resultType.getFieldNames().get(0));
             
-            // 第二个字段是 COUNT 结果
+            // Second field is COUNT result
             assertEquals("cnt", resultType.getFieldNames().get(1));
             assertTrue(resultType.getTypeAt(1) instanceof BigIntType);
             
-            // 第三个字段是 SUM 结果
+            // Third field is SUM result
             assertEquals("sum_amount", resultType.getFieldNames().get(2));
             assertTrue(resultType.getTypeAt(2) instanceof DoubleType);
         }

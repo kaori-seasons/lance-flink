@@ -73,9 +73,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * RowData 与 Arrow 数据之间的转换器。
+ * Converter between RowData and Arrow data.
  * 
- * <p>负责 Arrow VectorSchemaRoot 与 Flink RowData 之间的双向转换。
+ * <p>Responsible for bidirectional conversion between Arrow VectorSchemaRoot and Flink RowData.
  */
 public class RowDataConverter implements Serializable {
 
@@ -95,10 +95,10 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 将 Arrow VectorSchemaRoot 转换为 RowData 列表
+     * Convert Arrow VectorSchemaRoot to RowData list
      *
      * @param root Arrow VectorSchemaRoot
-     * @return RowData 列表
+     * @return RowData list
      */
     public List<RowData> toRowDataList(VectorSchemaRoot root) {
         List<RowData> rows = new ArrayList<>();
@@ -127,9 +127,9 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 将 RowData 列表写入 Arrow VectorSchemaRoot
+     * Write RowData list to Arrow VectorSchemaRoot
      *
-     * @param rows RowData 列表
+     * @param rows RowData list
      * @param root Arrow VectorSchemaRoot
      */
     public void toVectorSchemaRoot(List<RowData> rows, VectorSchemaRoot root) {
@@ -155,9 +155,9 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 创建 VectorSchemaRoot
+     * Create VectorSchemaRoot
      *
-     * @param allocator 内存分配器
+     * @param allocator Memory allocator
      * @return VectorSchemaRoot
      */
     public VectorSchemaRoot createVectorSchemaRoot(BufferAllocator allocator) {
@@ -166,7 +166,7 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 从 Arrow Vector 中读取值
+     * Read value from Arrow Vector
      */
     private Object readValue(FieldVector vector, int index, LogicalType logicalType) {
         if (vector.isNull(index)) {
@@ -206,11 +206,11 @@ public class RowDataConverter implements Serializable {
         }
 
         throw new LanceTypeConverter.UnsupportedTypeException(
-                "不支持读取类型: " + logicalType.getClass().getSimpleName());
+                "Unsupported read type: " + logicalType.getClass().getSimpleName());
     }
 
     /**
-     * 读取时间戳值
+     * Read timestamp value
      */
     private TimestampData readTimestamp(FieldVector vector, int index, TimestampType tsType) {
         long value;
@@ -231,11 +231,11 @@ public class RowDataConverter implements Serializable {
         }
 
         throw new LanceTypeConverter.UnsupportedTypeException(
-                "不支持的时间戳 Vector 类型: " + vector.getClass().getSimpleName());
+                "Unsupported timestamp Vector type: " + vector.getClass().getSimpleName());
     }
 
     /**
-     * 读取数组值
+     * Read array value
      */
     private ArrayData readArray(FieldVector vector, int index, ArrayType arrayType) {
         LogicalType elementType = arrayType.getElementType();
@@ -258,11 +258,11 @@ public class RowDataConverter implements Serializable {
         }
 
         throw new LanceTypeConverter.UnsupportedTypeException(
-                "不支持的数组 Vector 类型: " + vector.getClass().getSimpleName());
+                "Unsupported array Vector type: " + vector.getClass().getSimpleName());
     }
 
     /**
-     * 读取数组数据
+     * Read array data
      */
     private ArrayData readArrayData(FieldVector dataVector, int startIndex, int size, LogicalType elementType) {
         if (elementType instanceof FloatType) {
@@ -323,11 +323,11 @@ public class RowDataConverter implements Serializable {
         }
 
         throw new LanceTypeConverter.UnsupportedTypeException(
-                "不支持的数组元素类型: " + elementType.getClass().getSimpleName());
+                "Unsupported array element type: " + elementType.getClass().getSimpleName());
     }
 
     /**
-     * 内部类，用于处理 Double 类型的 Vector（Float8Vector 的别名）
+     * Internal class for handling Double type Vector (alias for Float8Vector)
      */
     private static class Double8Vector {
         private final Float8Vector vector;
@@ -346,7 +346,7 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 读取结构体值
+     * Read struct value
      */
     private RowData readStruct(FieldVector vector, int index, RowType rowType) {
         StructVector structVector = (StructVector) vector;
@@ -368,7 +368,7 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 从 RowData 中获取字段值
+     * Get field value from RowData
      */
     private Object getFieldValue(RowData rowData, int index, LogicalType logicalType) {
         if (rowData.isNullAt(index)) {
@@ -406,11 +406,11 @@ public class RowDataConverter implements Serializable {
         }
 
         throw new LanceTypeConverter.UnsupportedTypeException(
-                "不支持获取类型: " + logicalType.getClass().getSimpleName());
+                "Unsupported get type: " + logicalType.getClass().getSimpleName());
     }
 
     /**
-     * 将值写入 Arrow Vector
+     * Write value to Arrow Vector
      */
     private void writeValue(FieldVector vector, int index, Object value, LogicalType logicalType) {
         if (value == null) {
@@ -449,12 +449,12 @@ public class RowDataConverter implements Serializable {
             writeStruct(vector, index, (RowData) value, (RowType) logicalType);
         } else {
             throw new LanceTypeConverter.UnsupportedTypeException(
-                    "不支持写入类型: " + logicalType.getClass().getSimpleName());
+                    "Unsupported write type: " + logicalType.getClass().getSimpleName());
         }
     }
 
     /**
-     * 设置 null 值
+     * Set null value
      */
     private void setNull(FieldVector vector, int index) {
         if (vector instanceof TinyIntVector) {
@@ -497,7 +497,7 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 写入时间戳值
+     * Write timestamp value
      */
     private void writeTimestamp(FieldVector vector, int index, TimestampData tsData, TimestampType tsType) {
         long millis = tsData.getMillisecond();
@@ -515,12 +515,12 @@ public class RowDataConverter implements Serializable {
             ((TimeStampNanoVector) vector).setSafe(index, totalNanos);
         } else {
             throw new LanceTypeConverter.UnsupportedTypeException(
-                    "不支持的时间戳 Vector 类型: " + vector.getClass().getSimpleName());
+                    "Unsupported timestamp Vector type: " + vector.getClass().getSimpleName());
         }
     }
 
     /**
-     * 写入数组值
+     * Write array value
      */
     private void writeArray(FieldVector vector, int index, ArrayData arrayData, ArrayType arrayType) {
         LogicalType elementType = arrayType.getElementType();
@@ -532,7 +532,7 @@ public class RowDataConverter implements Serializable {
             
             if (size != listSize) {
                 throw new IllegalArgumentException(
-                        "数组大小 " + size + " 与 FixedSizeList 大小 " + listSize + " 不匹配");
+                        "Array size " + size + " does not match FixedSizeList size " + listSize);
             }
             
             FieldVector dataVector = listVector.getDataVector();
@@ -551,12 +551,12 @@ public class RowDataConverter implements Serializable {
             listVector.endValue(index, size);
         } else {
             throw new LanceTypeConverter.UnsupportedTypeException(
-                    "不支持的数组 Vector 类型: " + vector.getClass().getSimpleName());
+                    "Unsupported array Vector type: " + vector.getClass().getSimpleName());
         }
     }
 
     /**
-     * 写入数组数据
+     * Write array data
      */
     private void writeArrayData(FieldVector dataVector, int startIndex, ArrayData arrayData, LogicalType elementType) {
         int size = arrayData.size();
@@ -609,12 +609,12 @@ public class RowDataConverter implements Serializable {
             }
         } else {
             throw new LanceTypeConverter.UnsupportedTypeException(
-                    "不支持的数组元素类型: " + elementType.getClass().getSimpleName());
+                    "Unsupported array element type: " + elementType.getClass().getSimpleName());
         }
     }
 
     /**
-     * 写入结构体值
+     * Write struct value
      */
     private void writeStruct(FieldVector vector, int index, RowData rowData, RowType rowType) {
         StructVector structVector = (StructVector) vector;
@@ -633,9 +633,9 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 将 float 数组转换为 ArrayData
+     * Convert float array to ArrayData
      *
-     * @param vector float 数组
+     * @param vector float array
      * @return ArrayData
      */
     public static ArrayData toArrayData(float[] vector) {
@@ -650,9 +650,9 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 将 double 数组转换为 ArrayData
+     * Convert double array to ArrayData
      *
-     * @param vector double 数组
+     * @param vector double array
      * @return ArrayData
      */
     public static ArrayData toArrayData(double[] vector) {
@@ -667,10 +667,10 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 将 ArrayData 转换为 float 数组
+     * Convert ArrayData to float array
      *
      * @param arrayData ArrayData
-     * @return float 数组
+     * @return float array
      */
     public static float[] toFloatArray(ArrayData arrayData) {
         if (arrayData == null) {
@@ -685,10 +685,10 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 将 ArrayData 转换为 double 数组
+     * Convert ArrayData to double array
      *
      * @param arrayData ArrayData
-     * @return double 数组
+     * @return double array
      */
     public static double[] toDoubleArray(ArrayData arrayData) {
         if (arrayData == null) {
@@ -703,21 +703,21 @@ public class RowDataConverter implements Serializable {
     }
 
     /**
-     * 获取 RowType
+     * Get RowType
      */
     public RowType getRowType() {
         return rowType;
     }
 
     /**
-     * 获取字段名数组
+     * Get field name array
      */
     public String[] getFieldNames() {
         return fieldNames;
     }
 
     /**
-     * 获取字段类型数组
+     * Get field type array
      */
     public LogicalType[] getFieldTypes() {
         return fieldTypes;

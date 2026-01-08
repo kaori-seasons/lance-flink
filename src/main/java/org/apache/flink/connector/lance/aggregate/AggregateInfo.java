@@ -25,19 +25,19 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 聚合信息封装类。
+ * Aggregate information encapsulation class.
  * 
- * <p>用于封装聚合下推所需的信息，包括聚合函数、目标列和分组列。
+ * <p>Encapsulates information needed for aggregate push-down, including aggregate functions, target columns and group by columns.
  */
 public class AggregateInfo implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 支持的聚合函数类型
+     * Supported aggregate function types
      */
     public enum AggregateFunction {
-        /** COUNT(*) 或 COUNT(column) */
+        /** COUNT(*) or COUNT(column) */
         COUNT,
         /** COUNT(DISTINCT column) */
         COUNT_DISTINCT,
@@ -52,14 +52,14 @@ public class AggregateInfo implements Serializable {
     }
 
     /**
-     * 单个聚合调用信息
+     * Single aggregate call information
      */
     public static class AggregateCall implements Serializable {
         private static final long serialVersionUID = 1L;
 
         private final AggregateFunction function;
-        private final String column;  // null 表示 COUNT(*)
-        private final String alias;   // 聚合结果的别名
+        private final String column;  // null means COUNT(*)
+        private final String alias;   // alias for aggregate result
 
         public AggregateCall(AggregateFunction function, String column, String alias) {
             this.function = function;
@@ -80,7 +80,7 @@ public class AggregateInfo implements Serializable {
         }
 
         /**
-         * 是否是 COUNT(*)
+         * Whether is COUNT(*)
          */
         public boolean isCountStar() {
             return function == AggregateFunction.COUNT && column == null;
@@ -134,14 +134,14 @@ public class AggregateInfo implements Serializable {
     }
 
     /**
-     * 是否有分组
+     * Whether has group by
      */
     public boolean hasGroupBy() {
         return !groupByColumns.isEmpty();
     }
 
     /**
-     * 是否是简单的 COUNT(*) 查询（无分组）
+     * Whether is simple COUNT(*) query (no group by)
      */
     public boolean isSimpleCountStar() {
         return aggregateCalls.size() == 1 && 
@@ -150,7 +150,7 @@ public class AggregateInfo implements Serializable {
     }
 
     /**
-     * 获取所有需要的列（聚合列 + 分组列）
+     * Get all required columns (aggregate columns + group by columns)
      */
     public List<String> getRequiredColumns() {
         List<String> columns = new ArrayList<>(groupByColumns);
@@ -192,7 +192,7 @@ public class AggregateInfo implements Serializable {
     }
 
     /**
-     * AggregateInfo 构建器
+     * AggregateInfo builder
      */
     public static class Builder {
         private final List<AggregateCall> aggregateCalls = new ArrayList<>();
@@ -250,7 +250,7 @@ public class AggregateInfo implements Serializable {
 
         public AggregateInfo build() {
             if (aggregateCalls.isEmpty()) {
-                throw new IllegalArgumentException("至少需要一个聚合函数");
+                throw new IllegalArgumentException("At least one aggregate function is required");
             }
             return new AggregateInfo(this);
         }

@@ -44,16 +44,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 读取优化功能测试
+ * Read optimization tests
  * 
- * <p>测试内容：
+ * <p>Test contents:
  * <ul>
- *   <li>Limit 下推</li>
- *   <li>谓词下推（基本比较、IN、BETWEEN）</li>
- *   <li>列裁剪</li>
+ *   <li>Limit push-down</li>
+ *   <li>Predicate push-down (basic comparison, IN, BETWEEN)</li>
+ *   <li>Column pruning</li>
  * </ul>
  */
-@DisplayName("读取优化测试")
+@DisplayName("Read Optimization Tests")
 public class LanceReadOptimizationsTest {
 
     @TempDir
@@ -69,7 +69,7 @@ public class LanceReadOptimizationsTest {
                 .readBatchSize(100)
                 .build();
 
-        // 定义测试表结构
+        // Define test table schema
         physicalDataType = DataTypes.ROW(
                 DataTypes.FIELD("id", DataTypes.BIGINT()),
                 DataTypes.FIELD("name", DataTypes.STRING()),
@@ -79,96 +79,96 @@ public class LanceReadOptimizationsTest {
         );
     }
 
-    // ==================== Limit 下推测试 ====================
+    // ==================== Limit Push-Down Tests ====================
 
     @Nested
-    @DisplayName("Limit 下推测试")
+    @DisplayName("Limit Push-Down Tests")
     class LimitPushDownTests {
 
         @Test
-        @DisplayName("测试 applyLimit 方法")
+        @DisplayName("Test applyLimit method")
         void testApplyLimit() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 初始状态应该没有 limit
-            assertNull(source.getLimit(), "初始 limit 应该为 null");
+            // Initial state should have no limit
+            assertNull(source.getLimit(), "Initial limit should be null");
 
-            // 应用 limit
+            // Apply limit
             source.applyLimit(100);
 
-            // 验证 limit 被设置
-            assertEquals(100L, source.getLimit(), "Limit 应该被正确设置为 100");
+            // Verify limit is set
+            assertEquals(100L, source.getLimit(), "Limit should be correctly set to 100");
         }
 
         @Test
-        @DisplayName("测试 Limit 为 0 的情况")
+        @DisplayName("Test Limit of 0")
         void testZeroLimit() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
             source.applyLimit(0);
-            assertEquals(0L, source.getLimit(), "Limit 应该可以设置为 0");
+            assertEquals(0L, source.getLimit(), "Limit should be settable to 0");
         }
 
         @Test
-        @DisplayName("测试大 Limit 值")
+        @DisplayName("Test large Limit value")
         void testLargeLimit() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
             long largeLimit = Long.MAX_VALUE;
             source.applyLimit(largeLimit);
-            assertEquals(largeLimit, source.getLimit(), "应该支持大的 Limit 值");
+            assertEquals(largeLimit, source.getLimit(), "Should support large Limit values");
         }
 
         @Test
-        @DisplayName("测试 copy 保留 Limit")
+        @DisplayName("Test copy preserves Limit")
         void testCopyPreservesLimit() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
             source.applyLimit(50);
 
             LanceDynamicTableSource copied = (LanceDynamicTableSource) source.copy();
 
-            assertEquals(50L, copied.getLimit(), "copy() 应该保留 limit 值");
+            assertEquals(50L, copied.getLimit(), "copy() should preserve limit value");
         }
     }
 
-    // ==================== 谓词下推测试 ====================
+    // ==================== Predicate Push-Down Tests ====================
 
     @Nested
-    @DisplayName("谓词下推测试")
+    @DisplayName("Predicate Push-Down Tests")
     class FilterPushDownTests {
 
         @Test
-        @DisplayName("测试等于比较下推")
+        @DisplayName("Test equals comparison push-down")
         void testEqualsFilterPushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 status = 'active' 表达式
+            // Create status = 'active' expression
             List<ResolvedExpression> filters = createEqualsFilter("status", "active");
 
             SupportsFilterPushDown.Result result = source.applyFilters(filters);
 
-            // 验证过滤器被接受
-            assertEquals(1, result.getAcceptedFilters().size(), "等于比较应该被接受");
-            assertEquals(0, result.getRemainingFilters().size(), "不应该有剩余过滤器");
+            // Verify filter is accepted
+            assertEquals(1, result.getAcceptedFilters().size(), "Equals comparison should be accepted");
+            assertEquals(0, result.getRemainingFilters().size(), "Should not have remaining filters");
         }
 
         @Test
-        @DisplayName("测试数值比较下推")
+        @DisplayName("Test numeric comparison push-down")
         void testNumericComparisonPushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 score > 80 表达式
+            // Create score > 80 expression
             List<ResolvedExpression> filters = createComparisonFilter("score", 80.0, BuiltInFunctionDefinitions.GREATER_THAN);
 
             SupportsFilterPushDown.Result result = source.applyFilters(filters);
 
-            assertEquals(1, result.getAcceptedFilters().size(), "数值比较应该被接受");
+            assertEquals(1, result.getAcceptedFilters().size(), "Numeric comparison should be accepted");
         }
 
         @Test
-        @DisplayName("测试 AND 逻辑下推")
+        @DisplayName("Test AND logic push-down")
         void testAndLogicPushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 status = 'active' AND score > 60 表达式
+            // Create status = 'active' AND score > 60 expression
             ResolvedExpression statusFilter = createEqualsExpression("status", "active");
             ResolvedExpression scoreFilter = createComparisonExpression("score", 60.0, BuiltInFunctionDefinitions.GREATER_THAN);
             
@@ -180,15 +180,15 @@ public class LanceReadOptimizationsTest {
 
             SupportsFilterPushDown.Result result = source.applyFilters(Collections.singletonList(andExpr));
 
-            assertEquals(1, result.getAcceptedFilters().size(), "AND 逻辑应该被接受");
+            assertEquals(1, result.getAcceptedFilters().size(), "AND logic should be accepted");
         }
 
         @Test
-        @DisplayName("测试 IS NULL 下推")
+        @DisplayName("Test IS NULL push-down")
         void testIsNullPushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 name IS NULL 表达式
+            // Create name IS NULL expression
             FieldReferenceExpression fieldRef = new FieldReferenceExpression(
                     "name", DataTypes.STRING(), 0, 1);
             
@@ -200,15 +200,15 @@ public class LanceReadOptimizationsTest {
 
             SupportsFilterPushDown.Result result = source.applyFilters(Collections.singletonList(isNullExpr));
 
-            assertEquals(1, result.getAcceptedFilters().size(), "IS NULL 应该被接受");
+            assertEquals(1, result.getAcceptedFilters().size(), "IS NULL should be accepted");
         }
 
         @Test
-        @DisplayName("测试 IS NOT NULL 下推")
+        @DisplayName("Test IS NOT NULL push-down")
         void testIsNotNullPushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 name IS NOT NULL 表达式
+            // Create name IS NOT NULL expression
             FieldReferenceExpression fieldRef = new FieldReferenceExpression(
                     "name", DataTypes.STRING(), 0, 1);
             
@@ -220,15 +220,15 @@ public class LanceReadOptimizationsTest {
 
             SupportsFilterPushDown.Result result = source.applyFilters(Collections.singletonList(isNotNullExpr));
 
-            assertEquals(1, result.getAcceptedFilters().size(), "IS NOT NULL 应该被接受");
+            assertEquals(1, result.getAcceptedFilters().size(), "IS NOT NULL should be accepted");
         }
 
         @Test
-        @DisplayName("测试 LIKE 下推")
+        @DisplayName("Test LIKE push-down")
         void testLikePushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 name LIKE 'test%' 表达式
+            // Create name LIKE 'test%' expression
             FieldReferenceExpression fieldRef = new FieldReferenceExpression(
                     "name", DataTypes.STRING(), 0, 1);
             ValueLiteralExpression pattern = new ValueLiteralExpression("test%");
@@ -241,15 +241,15 @@ public class LanceReadOptimizationsTest {
 
             SupportsFilterPushDown.Result result = source.applyFilters(Collections.singletonList(likeExpr));
 
-            assertEquals(1, result.getAcceptedFilters().size(), "LIKE 应该被接受");
+            assertEquals(1, result.getAcceptedFilters().size(), "LIKE should be accepted");
         }
 
         @Test
-        @DisplayName("测试 IN 谓词下推")
+        @DisplayName("Test IN predicate push-down")
         void testInPredicatePushDown() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建 status IN ('active', 'pending', 'completed') 表达式
+            // Create status IN ('active', 'pending', 'completed') expression
             FieldReferenceExpression fieldRef = new FieldReferenceExpression(
                     "status", DataTypes.STRING(), 0, 2);
             ValueLiteralExpression value1 = new ValueLiteralExpression("active");
@@ -264,15 +264,15 @@ public class LanceReadOptimizationsTest {
 
             SupportsFilterPushDown.Result result = source.applyFilters(Collections.singletonList(inExpr));
 
-            assertEquals(1, result.getAcceptedFilters().size(), "IN 谓词应该被接受");
+            assertEquals(1, result.getAcceptedFilters().size(), "IN predicate should be accepted");
         }
 
         @Test
-        @DisplayName("测试多个独立过滤条件")
+        @DisplayName("Test multiple independent filter conditions")
         void testMultipleFilters() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 创建多个独立过滤条件
+            // Create multiple independent filter conditions
             List<ResolvedExpression> filter1 = createEqualsFilter("status", "active");
             List<ResolvedExpression> filter2 = createComparisonFilter("score", 60.0, BuiltInFunctionDefinitions.GREATER_THAN_OR_EQUAL);
 
@@ -282,67 +282,67 @@ public class LanceReadOptimizationsTest {
 
             SupportsFilterPushDown.Result result = source.applyFilters(allFilters);
 
-            assertEquals(2, result.getAcceptedFilters().size(), "两个过滤条件都应该被接受");
-            assertEquals(0, result.getRemainingFilters().size(), "不应该有剩余过滤器");
+            assertEquals(2, result.getAcceptedFilters().size(), "Two filter conditions should be accepted");
+            assertEquals(0, result.getRemainingFilters().size(), "Should not have remaining filters");
         }
 
         @Test
-        @DisplayName("测试 copy 保留过滤条件")
+        @DisplayName("Test copy preserves filter conditions")
         void testCopyPreservesFilters() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 应用过滤条件
+            // Apply filter conditions
             List<ResolvedExpression> filters = createEqualsFilter("status", "active");
             source.applyFilters(filters);
 
             LanceDynamicTableSource copied = (LanceDynamicTableSource) source.copy();
 
-            // 验证 copy 后的 source 保留了过滤条件
-            assertNotNull(copied, "copy() 应该成功");
+            // Verify copied source preserves filter conditions
+            assertNotNull(copied, "copy() should succeed");
         }
     }
 
-    // ==================== 列裁剪测试 ====================
+    // ==================== Column Pruning Tests ====================
 
     @Nested
-    @DisplayName("列裁剪测试")
+    @DisplayName("Column Pruning Tests")
     class ProjectionPushDownTests {
 
         @Test
-        @DisplayName("测试单列投影")
+        @DisplayName("Test single column projection")
         void testSingleColumnProjection() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 只选择 id 列
-            int[][] projection = {{0}};  // 第一列
+            // Select only id column
+            int[][] projection = {{0}};  // First column
             source.applyProjection(projection);
 
-            // 验证投影被应用
-            assertNotNull(source, "投影应该被成功应用");
+            // Verify projection is applied
+            assertNotNull(source, "Projection should be successfully applied");
         }
 
         @Test
-        @DisplayName("测试多列投影")
+        @DisplayName("Test multiple column projection")
         void testMultipleColumnProjection() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 选择 id, name, score 列
+            // Select id, name, score columns
             int[][] projection = {{0}, {1}, {3}};
             source.applyProjection(projection);
 
-            assertNotNull(source, "多列投影应该被成功应用");
+            assertNotNull(source, "Multiple column projection should be successfully applied");
         }
 
         @Test
-        @DisplayName("测试不支持嵌套投影")
+        @DisplayName("Test nested projection not supported")
         void testNestedProjectionNotSupported() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            assertFalse(source.supportsNestedProjection(), "不应该支持嵌套投影");
+            assertFalse(source.supportsNestedProjection(), "Should not support nested projection");
         }
 
         @Test
-        @DisplayName("测试 copy 保留投影")
+        @DisplayName("Test copy preserves projection")
         void testCopyPreservesProjection() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
@@ -351,99 +351,99 @@ public class LanceReadOptimizationsTest {
 
             LanceDynamicTableSource copied = (LanceDynamicTableSource) source.copy();
 
-            assertNotNull(copied, "copy() 应该保留投影信息");
+            assertNotNull(copied, "copy() should preserve projection information");
         }
     }
 
-    // ==================== 组合测试 ====================
+    // ==================== Combined Tests ====================
 
     @Nested
-    @DisplayName("组合优化测试")
+    @DisplayName("Combined Optimization Tests")
     class CombinedOptimizationsTests {
 
         @Test
-        @DisplayName("测试 Limit + 过滤条件组合")
+        @DisplayName("Test Limit + filter condition combination")
         void testLimitWithFilter() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 应用过滤条件
+            // Apply filter condition
             List<ResolvedExpression> filters = createEqualsFilter("status", "active");
             source.applyFilters(filters);
 
-            // 应用 limit
+            // Apply limit
             source.applyLimit(100L);
 
-            assertEquals(Long.valueOf(100L), source.getLimit(), "Limit 应该被正确设置");
+            assertEquals(Long.valueOf(100L), source.getLimit(), "Limit should be correctly set");
         }
 
         @Test
-        @DisplayName("测试 Limit + 投影组合")
+        @DisplayName("Test Limit + projection combination")
         void testLimitWithProjection() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 应用投影
+            // Apply projection
             int[][] projection = {{0}, {1}};
             source.applyProjection(projection);
 
-            // 应用 limit
+            // Apply limit
             source.applyLimit(50L);
 
-            assertEquals(Long.valueOf(50L), source.getLimit(), "Limit 应该被正确设置");
+            assertEquals(Long.valueOf(50L), source.getLimit(), "Limit should be correctly set");
         }
 
         @Test
-        @DisplayName("测试全部优化组合")
+        @DisplayName("Test all optimizations combined")
         void testAllOptimizations() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(baseOptions, physicalDataType);
 
-            // 1. 应用投影
+            // 1. Apply projection
             int[][] projection = {{0}, {1}, {3}};  // id, name, score
             source.applyProjection(projection);
 
-            // 2. 应用过滤条件
+            // 2. Apply filter condition
             List<ResolvedExpression> filters = createComparisonFilter("score", 60.0, BuiltInFunctionDefinitions.GREATER_THAN_OR_EQUAL);
             SupportsFilterPushDown.Result result = source.applyFilters(filters);
 
-            // 3. 应用 limit
+            // 3. Apply limit
             source.applyLimit(100L);
 
-            // 验证所有优化都被正确应用
-            assertEquals(1, result.getAcceptedFilters().size(), "过滤条件应该被接受");
-            assertEquals(Long.valueOf(100L), source.getLimit(), "Limit 应该被正确设置");
+            // Verify all optimizations are correctly applied
+            assertEquals(1, result.getAcceptedFilters().size(), "Filter condition should be accepted");
+            assertEquals(Long.valueOf(100L), source.getLimit(), "Limit should be correctly set");
         }
     }
 
-    // ==================== LanceOptions 测试 ====================
+    // ==================== LanceOptions Tests ====================
 
     @Nested
-    @DisplayName("LanceOptions Limit 配置测试")
+    @DisplayName("LanceOptions Limit Configuration Tests")
     class LanceOptionsLimitTests {
 
         @Test
-        @DisplayName("测试 readLimit 配置")
+        @DisplayName("Test readLimit configuration")
         void testReadLimitConfig() {
             LanceOptions options = LanceOptions.builder()
                     .path("/test/path")
                     .readLimit(500L)
                     .build();
 
-            assertEquals(500L, options.getReadLimit(), "readLimit 应该被正确配置");
+            assertEquals(500L, options.getReadLimit(), "readLimit should be correctly configured");
         }
 
         @Test
-        @DisplayName("测试 readLimit 默认值")
+        @DisplayName("Test readLimit default value")
         void testReadLimitDefault() {
             LanceOptions options = LanceOptions.builder()
                     .path("/test/path")
                     .build();
 
-            assertNull(options.getReadLimit(), "readLimit 默认应该为 null");
+            assertNull(options.getReadLimit(), "readLimit default should be null");
         }
 
         @Test
-        @DisplayName("测试 readLimit 为 0")
+        @DisplayName("Test readLimit of 0")
         void testReadLimitZero() {
-            // 0 应该被允许（表示不读取任何数据）
+            // 0 should be allowed (means don't read any data)
             LanceOptions options = LanceOptions.builder()
                     .path("/test/path")
                     .readLimit(0L)
@@ -453,21 +453,21 @@ public class LanceReadOptimizationsTest {
         }
 
         @Test
-        @DisplayName("测试负数 readLimit 应该失败")
+        @DisplayName("Test negative readLimit should fail")
         void testNegativeReadLimit() {
             assertThrows(IllegalArgumentException.class, () -> {
                 LanceOptions.builder()
                         .path("/test/path")
                         .readLimit(-1L)
                         .build();
-            }, "负数的 readLimit 应该抛出异常");
+            }, "Negative readLimit should throw exception");
         }
     }
 
-    // ==================== 辅助方法 ====================
+    // ==================== Helper Methods ====================
 
     /**
-     * 创建等于比较过滤表达式
+     * Create equals comparison filter expression
      */
     private List<ResolvedExpression> createEqualsFilter(String fieldName, String value) {
         ResolvedExpression expr = createEqualsExpression(fieldName, value);
@@ -475,7 +475,7 @@ public class LanceReadOptimizationsTest {
     }
 
     /**
-     * 创建等于比较表达式
+     * Create equals comparison expression
      */
     private ResolvedExpression createEqualsExpression(String fieldName, String value) {
         FieldReferenceExpression fieldRef = new FieldReferenceExpression(
@@ -490,7 +490,7 @@ public class LanceReadOptimizationsTest {
     }
 
     /**
-     * 创建比较过滤表达式
+     * Create comparison filter expression
      */
     private List<ResolvedExpression> createComparisonFilter(String fieldName, Double value, BuiltInFunctionDefinition funcDef) {
         ResolvedExpression expr = createComparisonExpression(fieldName, value, funcDef);
@@ -498,7 +498,7 @@ public class LanceReadOptimizationsTest {
     }
 
     /**
-     * 创建比较表达式
+     * Create comparison expression
      */
     private ResolvedExpression createComparisonExpression(String fieldName, Double value, BuiltInFunctionDefinition funcDef) {
         FieldReferenceExpression fieldRef = new FieldReferenceExpression(
@@ -513,7 +513,7 @@ public class LanceReadOptimizationsTest {
     }
 
     /**
-     * 获取字段索引
+     * Get field index
      */
     private int getFieldIndex(String fieldName) {
         switch (fieldName) {

@@ -48,18 +48,18 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Lance 向量检索 UDF。
+ * Lance vector search UDF.
  * 
- * <p>实现 TableFunction，支持在 SQL 中执行向量检索。
+ * <p>Implements TableFunction, supports executing vector search in SQL.
  * 
- * <p>使用示例：
+ * <p>Usage example:
  * <pre>{@code
- * -- 注册 UDF
+ * -- Register UDF
  * CREATE TEMPORARY FUNCTION vector_search AS 
  *     'org.apache.flink.connector.lance.table.LanceVectorSearchFunction'
  *     LANGUAGE JAVA USING JAR '/path/to/flink-connector-lance.jar';
  * 
- * -- 使用 UDF 进行向量检索
+ * -- Use UDF for vector search
  * SELECT * FROM TABLE(
  *     vector_search('/path/to/dataset', 'embedding', ARRAY[0.1, 0.2, 0.3], 10, 'L2')
  * );
@@ -80,18 +80,18 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     @Override
     public void open(FunctionContext context) throws Exception {
         super.open(context);
-        LOG.info("打开 LanceVectorSearchFunction");
+        LOG.info("Opening LanceVectorSearchFunction");
     }
 
     @Override
     public void close() throws Exception {
-        LOG.info("关闭 LanceVectorSearchFunction");
+        LOG.info("Closing LanceVectorSearchFunction");
         
         if (vectorSearch != null) {
             try {
                 vectorSearch.close();
             } catch (Exception e) {
-                LOG.warn("关闭向量检索器失败", e);
+                LOG.warn("Failed to close vector searcher", e);
             }
             vectorSearch = null;
         }
@@ -100,17 +100,17 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 执行向量检索
+     * Execute vector search
      *
-     * @param datasetPath 数据集路径
-     * @param columnName 向量列名
-     * @param queryVector 查询向量
-     * @param k 返回的最近邻数量
-     * @param metric 距离度量类型：L2, Cosine, Dot
+     * @param datasetPath Dataset path
+     * @param columnName Vector column name
+     * @param queryVector Query vector
+     * @param k Number of nearest neighbors to return
+     * @param metric Distance metric type: L2, Cosine, Dot
      */
     public void eval(String datasetPath, String columnName, Float[] queryVector, Integer k, String metric) {
         try {
-            // 检查是否需要重新初始化向量检索器
+            // Check if need to reinitialize vector searcher
             if (vectorSearch == null || 
                 !datasetPath.equals(currentDatasetPath) || 
                 !columnName.equals(currentColumnName)) {
@@ -135,22 +135,22 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
                 currentColumnName = columnName;
             }
             
-            // 转换查询向量
+            // Convert query vector
             float[] query = new float[queryVector.length];
             for (int i = 0; i < queryVector.length; i++) {
                 query[i] = queryVector[i] != null ? queryVector[i] : 0.0f;
             }
             
-            // 执行检索
+            // Execute search
             int topK = k != null ? k : 10;
             List<LanceVectorSearch.SearchResult> results = vectorSearch.search(query, topK);
             
-            // 输出结果
+            // Output results
             for (LanceVectorSearch.SearchResult result : results) {
                 RowData rowData = result.getRowData();
                 double distance = result.getDistance();
                 
-                // 构建输出 Row
+                // Build output Row
                 Row outputRow = convertToRow(rowData, distance);
                 if (outputRow != null) {
                     collect(outputRow);
@@ -158,48 +158,48 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
             }
             
         } catch (Exception e) {
-            LOG.error("向量检索失败", e);
-            throw new RuntimeException("向量检索失败: " + e.getMessage(), e);
+            LOG.error("Vector search failed", e);
+            throw new RuntimeException("Vector search failed: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 简化的向量检索（使用默认参数）
+     * Simplified vector search (using default parameters)
      *
-     * @param datasetPath 数据集路径
-     * @param columnName 向量列名
-     * @param queryVector 查询向量
-     * @param k 返回的最近邻数量
+     * @param datasetPath Dataset path
+     * @param columnName Vector column name
+     * @param queryVector Query vector
+     * @param k Number of nearest neighbors to return
      */
     public void eval(String datasetPath, String columnName, Float[] queryVector, Integer k) {
         eval(datasetPath, columnName, queryVector, k, "L2");
     }
 
     /**
-     * 最简化的向量检索
+     * Most simplified vector search
      *
-     * @param datasetPath 数据集路径
-     * @param columnName 向量列名
-     * @param queryVector 查询向量
+     * @param datasetPath Dataset path
+     * @param columnName Vector column name
+     * @param queryVector Query vector
      */
     public void eval(String datasetPath, String columnName, Float[] queryVector) {
         eval(datasetPath, columnName, queryVector, 10, "L2");
     }
 
-    // ==================== BigDecimal[] 参数重载 ====================
-    // Flink SQL 中 ARRAY[0.1, 0.2, ...] 会被解析为 BigDecimal[] 类型
+    // ==================== BigDecimal[] parameter overloads ====================
+    // ARRAY[0.1, 0.2, ...] in Flink SQL is parsed as BigDecimal[] type
 
     /**
-     * 执行向量检索（支持 BigDecimal[] 参数）
+     * Execute vector search (supports BigDecimal[] parameter)
      * 
-     * <p>Flink SQL 中的 ARRAY[0.1, 0.2, ...] 字面量会被解析为 DECIMAL 类型数组，
-     * 因此需要此方法重载来支持。
+     * <p>ARRAY[0.1, 0.2, ...] literals in Flink SQL are parsed as DECIMAL type arrays,
+     * so this method overload is needed for support.
      *
-     * @param datasetPath 数据集路径
-     * @param columnName 向量列名
-     * @param queryVector 查询向量（BigDecimal数组）
-     * @param k 返回的最近邻数量
-     * @param metric 距离度量类型：L2, Cosine, Dot
+     * @param datasetPath Dataset path
+     * @param columnName Vector column name
+     * @param queryVector Query vector (BigDecimal array)
+     * @param k Number of nearest neighbors to return
+     * @param metric Distance metric type: L2, Cosine, Dot
      */
     public void eval(String datasetPath, String columnName, BigDecimal[] queryVector, Integer k, String metric) {
         Float[] floatVector = convertBigDecimalToFloat(queryVector);
@@ -207,24 +207,24 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 简化的向量检索（BigDecimal[] 参数）
+     * Simplified vector search (BigDecimal[] parameter)
      */
     public void eval(String datasetPath, String columnName, BigDecimal[] queryVector, Integer k) {
         eval(datasetPath, columnName, queryVector, k, "L2");
     }
 
     /**
-     * 最简化的向量检索（BigDecimal[] 参数）
+     * Most simplified vector search (BigDecimal[] parameter)
      */
     public void eval(String datasetPath, String columnName, BigDecimal[] queryVector) {
         eval(datasetPath, columnName, queryVector, 10, "L2");
     }
 
-    // ==================== Double[] 参数重载 ====================
-    // 某些情况下参数可能被解析为 Double[] 类型
+    // ==================== Double[] parameter overloads ====================
+    // In some cases parameters may be parsed as Double[] type
 
     /**
-     * 执行向量检索（支持 Double[] 参数）
+     * Execute vector search (supports Double[] parameter)
      */
     public void eval(String datasetPath, String columnName, Double[] queryVector, Integer k, String metric) {
         Float[] floatVector = convertDoubleToFloat(queryVector);
@@ -232,23 +232,23 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 简化的向量检索（Double[] 参数）
+     * Simplified vector search (Double[] parameter)
      */
     public void eval(String datasetPath, String columnName, Double[] queryVector, Integer k) {
         eval(datasetPath, columnName, queryVector, k, "L2");
     }
 
     /**
-     * 最简化的向量检索（Double[] 参数）
+     * Most simplified vector search (Double[] parameter)
      */
     public void eval(String datasetPath, String columnName, Double[] queryVector) {
         eval(datasetPath, columnName, queryVector, 10, "L2");
     }
 
-    // ==================== float[] 原生数组参数重载 ====================
+    // ==================== float[] primitive array parameter overloads ====================
 
     /**
-     * 执行向量检索（支持 float[] 原生数组参数）
+     * Execute vector search (supports float[] primitive array parameter)
      */
     public void eval(String datasetPath, String columnName, float[] queryVector, Integer k, String metric) {
         Float[] floatVector = new Float[queryVector.length];
@@ -259,7 +259,7 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 将 BigDecimal 数组转换为 Float 数组
+     * Convert BigDecimal array to Float array
      */
     private Float[] convertBigDecimalToFloat(BigDecimal[] decimals) {
         if (decimals == null) {
@@ -273,7 +273,7 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 将 Double 数组转换为 Float 数组
+     * Convert Double array to Float array
      */
     private Float[] convertDoubleToFloat(Double[] doubles) {
         if (doubles == null) {
@@ -287,7 +287,7 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 将 RowData 转换为 Row
+     * Convert RowData to Row
      */
     private Row convertToRow(RowData rowData, double distance) {
         if (rowData == null) {
@@ -298,7 +298,7 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
             GenericRowData genericRowData = (GenericRowData) rowData;
             int arity = genericRowData.getArity();
             
-            // 创建包含距离字段的新 Row
+            // Create new Row including distance field
             Object[] values = new Object[arity + 1];
             for (int i = 0; i < arity; i++) {
                 Object field = genericRowData.getField(i);
@@ -313,7 +313,7 @@ public class LanceVectorSearchFunction extends TableFunction<Row> {
     }
 
     /**
-     * 转换字段值
+     * Convert field value
      */
     private Object convertField(Object field) {
         if (field == null) {

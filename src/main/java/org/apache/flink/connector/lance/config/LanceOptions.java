@@ -29,237 +29,237 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Lance 连接器配置选项。
+ * Lance connector configuration options.
  * 
- * <p>定义了 Source、Sink、向量索引和向量检索的所有配置项。
+ * <p>Defines all configuration items for Source, Sink, vector index and vector search.
  */
 public class LanceOptions implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    // ==================== 通用配置 ====================
+    // ==================== Common Configuration ====================
 
     /**
-     * Lance 数据集路径
+     * Lance dataset path
      */
     public static final ConfigOption<String> PATH = ConfigOptions
             .key("path")
             .stringType()
             .noDefaultValue()
-            .withDescription("Lance 数据集的路径（必填）");
+            .withDescription("Path to Lance dataset (required)");
 
-    // ==================== Source 配置 ====================
+    // ==================== Source Configuration ====================
 
     /**
-     * 读取批次大小
+     * Read batch size
      */
     public static final ConfigOption<Integer> READ_BATCH_SIZE = ConfigOptions
             .key("read.batch-size")
             .intType()
             .defaultValue(1024)
-            .withDescription("每次读取的批次大小，默认 1024");
+            .withDescription("Batch size for reading, default 1024");
 
     /**
-     * 读取行数限制（Limit 下推）
+     * Read row limit (Limit push-down)
      */
     public static final ConfigOption<Long> READ_LIMIT = ConfigOptions
             .key("read.limit")
             .longType()
             .noDefaultValue()
-            .withDescription("读取的最大行数限制（用于 Limit 下推）");
+            .withDescription("Maximum number of rows to read (for Limit push-down)");
 
     /**
-     * 读取的列列表（逗号分隔）
+     * List of columns to read (comma separated)
      */
     public static final ConfigOption<String> READ_COLUMNS = ConfigOptions
             .key("read.columns")
             .stringType()
             .noDefaultValue()
-            .withDescription("要读取的列列表，逗号分隔。为空则读取所有列");
+            .withDescription("List of columns to read, comma separated. Empty reads all columns");
 
     /**
-     * 数据过滤条件
+     * Data filter condition
      */
     public static final ConfigOption<String> READ_FILTER = ConfigOptions
             .key("read.filter")
             .stringType()
             .noDefaultValue()
-            .withDescription("数据过滤条件，使用 SQL WHERE 子句语法");
+            .withDescription("Data filter condition, using SQL WHERE clause syntax");
 
-    // ==================== Sink 配置 ====================
+    // ==================== Sink Configuration ====================
 
     /**
-     * 写入批次大小
+     * Write batch size
      */
     public static final ConfigOption<Integer> WRITE_BATCH_SIZE = ConfigOptions
             .key("write.batch-size")
             .intType()
             .defaultValue(1024)
-            .withDescription("每次写入的批次大小，默认 1024");
+            .withDescription("Batch size for writing, default 1024");
 
     /**
-     * 写入模式：append 或 overwrite
+     * Write mode: append or overwrite
      */
     public static final ConfigOption<String> WRITE_MODE = ConfigOptions
             .key("write.mode")
             .stringType()
             .defaultValue("append")
-            .withDescription("写入模式：append（追加）或 overwrite（覆盖），默认 append");
+            .withDescription("Write mode: append or overwrite, default append");
 
     /**
-     * 每个文件的最大行数
+     * Maximum rows per file
      */
     public static final ConfigOption<Integer> WRITE_MAX_ROWS_PER_FILE = ConfigOptions
             .key("write.max-rows-per-file")
             .intType()
             .defaultValue(1000000)
-            .withDescription("每个数据文件的最大行数，默认 1000000");
+            .withDescription("Maximum rows per data file, default 1000000");
 
-    // ==================== 向量索引配置 ====================
+    // ==================== Vector Index Configuration ====================
 
     /**
-     * 索引类型：IVF_PQ、IVF_HNSW、IVF_FLAT
+     * Index type: IVF_PQ, IVF_HNSW, IVF_FLAT
      */
     public static final ConfigOption<String> INDEX_TYPE = ConfigOptions
             .key("index.type")
             .stringType()
             .defaultValue("IVF_PQ")
-            .withDescription("向量索引类型：IVF_PQ、IVF_HNSW、IVF_FLAT，默认 IVF_PQ");
+            .withDescription("Vector index type: IVF_PQ, IVF_HNSW, IVF_FLAT, default IVF_PQ");
 
     /**
-     * 索引列名
+     * Index column name
      */
     public static final ConfigOption<String> INDEX_COLUMN = ConfigOptions
             .key("index.column")
             .stringType()
             .noDefaultValue()
-            .withDescription("要建立索引的向量列名（必填）");
+            .withDescription("Vector column name for indexing (required)");
 
     /**
-     * IVF 分区数量
+     * IVF partition count
      */
     public static final ConfigOption<Integer> INDEX_NUM_PARTITIONS = ConfigOptions
             .key("index.num-partitions")
             .intType()
             .defaultValue(256)
-            .withDescription("IVF 索引的分区数量，默认 256");
+            .withDescription("Number of IVF index partitions, default 256");
 
     /**
-     * PQ 子向量数量
+     * PQ sub-vector count
      */
     public static final ConfigOption<Integer> INDEX_NUM_SUB_VECTORS = ConfigOptions
             .key("index.num-sub-vectors")
             .intType()
             .noDefaultValue()
-            .withDescription("PQ 索引的子向量数量，默认自动计算");
+            .withDescription("Number of PQ index sub-vectors, default auto-calculated");
 
     /**
-     * PQ 量化位数
+     * PQ quantization bits
      */
     public static final ConfigOption<Integer> INDEX_NUM_BITS = ConfigOptions
             .key("index.num-bits")
             .intType()
             .defaultValue(8)
-            .withDescription("PQ 量化位数，默认 8");
+            .withDescription("PQ quantization bits, default 8");
 
     /**
-     * HNSW 最大层级
+     * HNSW max level
      */
     public static final ConfigOption<Integer> INDEX_MAX_LEVEL = ConfigOptions
             .key("index.max-level")
             .intType()
             .defaultValue(7)
-            .withDescription("HNSW 索引的最大层级，默认 7");
+            .withDescription("HNSW index max level, default 7");
 
     /**
-     * HNSW 每层连接数 M
+     * HNSW connections per level M
      */
     public static final ConfigOption<Integer> INDEX_M = ConfigOptions
             .key("index.m")
             .intType()
             .defaultValue(16)
-            .withDescription("HNSW 每层的连接数 M，默认 16");
+            .withDescription("HNSW connections per level M, default 16");
 
     /**
-     * HNSW 构建时的搜索宽度
+     * HNSW construction search width
      */
     public static final ConfigOption<Integer> INDEX_EF_CONSTRUCTION = ConfigOptions
             .key("index.ef-construction")
             .intType()
             .defaultValue(100)
-            .withDescription("HNSW 构建时的搜索宽度 ef_construction，默认 100");
+            .withDescription("HNSW construction search width ef_construction, default 100");
 
-    // ==================== 向量检索配置 ====================
+    // ==================== Vector Search Configuration ====================
 
     /**
-     * 向量检索列名
+     * Vector search column name
      */
     public static final ConfigOption<String> VECTOR_COLUMN = ConfigOptions
             .key("vector.column")
             .stringType()
             .noDefaultValue()
-            .withDescription("向量检索的列名（必填）");
+            .withDescription("Vector search column name (required)");
 
     /**
-     * 距离度量类型：L2、Cosine、Dot
+     * Distance metric type: L2, Cosine, Dot
      */
     public static final ConfigOption<String> VECTOR_METRIC = ConfigOptions
             .key("vector.metric")
             .stringType()
             .defaultValue("L2")
-            .withDescription("向量距离度量类型：L2（欧氏距离）、Cosine（余弦相似度）、Dot（点积），默认 L2");
+            .withDescription("Vector distance metric type: L2 (Euclidean), Cosine, Dot, default L2");
 
     /**
-     * IVF 检索探针数
+     * IVF search probe count
      */
     public static final ConfigOption<Integer> VECTOR_NPROBES = ConfigOptions
             .key("vector.nprobes")
             .intType()
             .defaultValue(20)
-            .withDescription("IVF 索引检索时的探针数量，默认 20");
+            .withDescription("Number of IVF index search probes, default 20");
 
     /**
-     * HNSW 搜索宽度
+     * HNSW search width
      */
     public static final ConfigOption<Integer> VECTOR_EF = ConfigOptions
             .key("vector.ef")
             .intType()
             .defaultValue(100)
-            .withDescription("HNSW 搜索时的宽度 ef，默认 100");
+            .withDescription("HNSW search width ef, default 100");
 
     /**
-     * 精细化因子
+     * Refine factor
      */
     public static final ConfigOption<Integer> VECTOR_REFINE_FACTOR = ConfigOptions
             .key("vector.refine-factor")
             .intType()
             .noDefaultValue()
-            .withDescription("向量检索的精细化因子，用于提高召回率");
+            .withDescription("Vector search refine factor for improving recall");
 
-    // ==================== Catalog 配置 ====================
+    // ==================== Catalog Configuration ====================
 
     /**
-     * 默认数据库名称
+     * Default database name
      */
     public static final ConfigOption<String> DEFAULT_DATABASE = ConfigOptions
             .key("default-database")
             .stringType()
             .defaultValue("default")
-            .withDescription("Catalog 默认数据库名称，默认 default");
+            .withDescription("Catalog default database name, default 'default'");
 
     /**
-     * 仓库路径
+     * Warehouse path
      */
     public static final ConfigOption<String> WAREHOUSE = ConfigOptions
             .key("warehouse")
             .stringType()
             .noDefaultValue()
-            .withDescription("Lance 数据仓库路径（必填）");
+            .withDescription("Lance data warehouse path (required)");
 
-    // ==================== 写入模式枚举 ====================
+    // ==================== Write Mode Enum ====================
 
     /**
-     * 写入模式枚举
+     * Write mode enum
      */
     public enum WriteMode {
         APPEND("append"),
@@ -281,14 +281,14 @@ public class LanceOptions implements Serializable {
                     return mode;
                 }
             }
-            throw new IllegalArgumentException("不支持的写入模式: " + value + "，支持的模式: append, overwrite");
+            throw new IllegalArgumentException("Unsupported write mode: " + value + ", supported modes: append, overwrite");
         }
     }
 
-    // ==================== 索引类型枚举 ====================
+    // ==================== Index Type Enum ====================
 
     /**
-     * 索引类型枚举
+     * Index type enum
      */
     public enum IndexType {
         IVF_PQ("IVF_PQ"),
@@ -311,14 +311,14 @@ public class LanceOptions implements Serializable {
                     return type;
                 }
             }
-            throw new IllegalArgumentException("不支持的索引类型: " + value + "，支持的类型: IVF_PQ, IVF_HNSW, IVF_FLAT");
+            throw new IllegalArgumentException("Unsupported index type: " + value + ", supported types: IVF_PQ, IVF_HNSW, IVF_FLAT");
         }
     }
 
-    // ==================== 距离度量类型枚举 ====================
+    // ==================== Metric Type Enum ====================
 
     /**
-     * 距离度量类型枚举
+     * Distance metric type enum
      */
     public enum MetricType {
         L2("L2"),
@@ -341,11 +341,11 @@ public class LanceOptions implements Serializable {
                     return type;
                 }
             }
-            throw new IllegalArgumentException("不支持的距离度量类型: " + value + "，支持的类型: L2, Cosine, Dot");
+            throw new IllegalArgumentException("Unsupported metric type: " + value + ", supported types: L2, Cosine, Dot");
         }
     }
 
-    // ==================== 配置类 ====================
+    // ==================== Configuration Class ====================
 
     private final String path;
     private final int readBatchSize;
@@ -397,7 +397,7 @@ public class LanceOptions implements Serializable {
         this.warehouse = builder.warehouse;
     }
 
-    // ==================== Getter 方法 ====================
+    // ==================== Getter Methods ====================
 
     public String getPath() {
         return path;
@@ -498,17 +498,17 @@ public class LanceOptions implements Serializable {
     }
 
     /**
-     * 从 Flink Configuration 创建 LanceOptions
+     * Create LanceOptions from Flink Configuration
      */
     public static LanceOptions fromConfiguration(Configuration config) {
         Builder builder = builder();
 
-        // 通用配置
+        // Common configuration
         if (config.contains(PATH)) {
             builder.path(config.get(PATH));
         }
 
-        // Source 配置
+        // Source configuration
         builder.readBatchSize(config.get(READ_BATCH_SIZE));
         if (config.contains(READ_LIMIT)) {
             builder.readLimit(config.get(READ_LIMIT));
@@ -523,12 +523,12 @@ public class LanceOptions implements Serializable {
             builder.readFilter(config.get(READ_FILTER));
         }
 
-        // Sink 配置
+        // Sink configuration
         builder.writeBatchSize(config.get(WRITE_BATCH_SIZE));
         builder.writeMode(WriteMode.fromValue(config.get(WRITE_MODE)));
         builder.writeMaxRowsPerFile(config.get(WRITE_MAX_ROWS_PER_FILE));
 
-        // 索引配置
+        // Index configuration
         builder.indexType(IndexType.fromValue(config.get(INDEX_TYPE)));
         if (config.contains(INDEX_COLUMN)) {
             builder.indexColumn(config.get(INDEX_COLUMN));
@@ -542,7 +542,7 @@ public class LanceOptions implements Serializable {
         builder.indexM(config.get(INDEX_M));
         builder.indexEfConstruction(config.get(INDEX_EF_CONSTRUCTION));
 
-        // 向量检索配置
+        // Vector search configuration
         if (config.contains(VECTOR_COLUMN)) {
             builder.vectorColumn(config.get(VECTOR_COLUMN));
         }
@@ -553,7 +553,7 @@ public class LanceOptions implements Serializable {
             builder.vectorRefineFactor(config.get(VECTOR_REFINE_FACTOR));
         }
 
-        // Catalog 配置
+        // Catalog configuration
         builder.defaultDatabase(config.get(DEFAULT_DATABASE));
         if (config.contains(WAREHOUSE)) {
             builder.warehouse(config.get(WAREHOUSE));
@@ -563,7 +563,7 @@ public class LanceOptions implements Serializable {
     }
 
     /**
-     * 配置构建器
+     * Configuration builder
      */
     public static class Builder {
         private String path;
@@ -706,7 +706,7 @@ public class LanceOptions implements Serializable {
         }
 
         /**
-         * 构建 LanceOptions 实例并进行校验
+         * Build LanceOptions instance with validation
          */
         public LanceOptions build() {
             validate();
@@ -714,68 +714,68 @@ public class LanceOptions implements Serializable {
         }
 
         /**
-         * 校验配置
+         * Validate configuration
          */
         private void validate() {
-            // 校验读取批次大小
+            // Validate read batch size
             if (readBatchSize <= 0) {
-                throw new IllegalArgumentException("read.batch-size 必须大于 0，当前值: " + readBatchSize);
+                throw new IllegalArgumentException("read.batch-size must be greater than 0, current value: " + readBatchSize);
             }
 
-            // 校验 Limit（如果设置了）
+            // Validate Limit (if set)
             if (readLimit != null && readLimit < 0) {
-                throw new IllegalArgumentException("read.limit 必须大于等于 0，当前值: " + readLimit);
+                throw new IllegalArgumentException("read.limit must be greater than or equal to 0, current value: " + readLimit);
             }
 
-            // 校验写入批次大小
+            // Validate write batch size
             if (writeBatchSize <= 0) {
-                throw new IllegalArgumentException("write.batch-size 必须大于 0，当前值: " + writeBatchSize);
+                throw new IllegalArgumentException("write.batch-size must be greater than 0, current value: " + writeBatchSize);
             }
 
-            // 校验每个文件最大行数
+            // Validate max rows per file
             if (writeMaxRowsPerFile <= 0) {
-                throw new IllegalArgumentException("write.max-rows-per-file 必须大于 0，当前值: " + writeMaxRowsPerFile);
+                throw new IllegalArgumentException("write.max-rows-per-file must be greater than 0, current value: " + writeMaxRowsPerFile);
             }
 
-            // 校验索引分区数
+            // Validate index partition count
             if (indexNumPartitions <= 0) {
-                throw new IllegalArgumentException("index.num-partitions 必须大于 0，当前值: " + indexNumPartitions);
+                throw new IllegalArgumentException("index.num-partitions must be greater than 0, current value: " + indexNumPartitions);
             }
 
-            // 校验 PQ 子向量数
+            // Validate PQ sub-vector count
             if (indexNumSubVectors != null && indexNumSubVectors <= 0) {
-                throw new IllegalArgumentException("index.num-sub-vectors 必须大于 0，当前值: " + indexNumSubVectors);
+                throw new IllegalArgumentException("index.num-sub-vectors must be greater than 0, current value: " + indexNumSubVectors);
             }
 
-            // 校验 PQ 量化位数
+            // Validate PQ quantization bits
             if (indexNumBits <= 0 || indexNumBits > 16) {
-                throw new IllegalArgumentException("index.num-bits 必须在 1-16 之间，当前值: " + indexNumBits);
+                throw new IllegalArgumentException("index.num-bits must be between 1 and 16, current value: " + indexNumBits);
             }
 
-            // 校验 HNSW 参数
+            // Validate HNSW parameters
             if (indexMaxLevel <= 0) {
-                throw new IllegalArgumentException("index.max-level 必须大于 0，当前值: " + indexMaxLevel);
+                throw new IllegalArgumentException("index.max-level must be greater than 0, current value: " + indexMaxLevel);
             }
 
             if (indexM <= 0) {
-                throw new IllegalArgumentException("index.m 必须大于 0，当前值: " + indexM);
+                throw new IllegalArgumentException("index.m must be greater than 0, current value: " + indexM);
             }
 
             if (indexEfConstruction <= 0) {
-                throw new IllegalArgumentException("index.ef-construction 必须大于 0，当前值: " + indexEfConstruction);
+                throw new IllegalArgumentException("index.ef-construction must be greater than 0, current value: " + indexEfConstruction);
             }
 
-            // 校验向量检索参数
+            // Validate vector search parameters
             if (vectorNprobes <= 0) {
-                throw new IllegalArgumentException("vector.nprobes 必须大于 0，当前值: " + vectorNprobes);
+                throw new IllegalArgumentException("vector.nprobes must be greater than 0, current value: " + vectorNprobes);
             }
 
             if (vectorEf <= 0) {
-                throw new IllegalArgumentException("vector.ef 必须大于 0，当前值: " + vectorEf);
+                throw new IllegalArgumentException("vector.ef must be greater than 0, current value: " + vectorEf);
             }
 
             if (vectorRefineFactor != null && vectorRefineFactor <= 0) {
-                throw new IllegalArgumentException("vector.refine-factor 必须大于 0，当前值: " + vectorRefineFactor);
+                throw new IllegalArgumentException("vector.refine-factor must be greater than 0, current value: " + vectorRefineFactor);
             }
         }
     }

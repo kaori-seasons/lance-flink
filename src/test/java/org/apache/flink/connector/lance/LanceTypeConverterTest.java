@@ -52,12 +52,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * LanceTypeConverter 单元测试。
+ * LanceTypeConverter unit tests.
  */
 class LanceTypeConverterTest {
 
     @Test
-    @DisplayName("测试 Arrow Int 类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow Int type to Flink type mapping")
     void testArrowIntToFlinkType() {
         // Int8 -> TINYINT
         Field int8Field = new Field("int8", FieldType.nullable(new ArrowType.Int(8, true)), null);
@@ -81,7 +81,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow 浮点类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow floating point type to Flink type mapping")
     void testArrowFloatToFlinkType() {
         // Float32 -> FLOAT
         Field float32Field = new Field("float32", 
@@ -97,7 +97,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow 字符串类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow string type to Flink type mapping")
     void testArrowStringToFlinkType() {
         // String -> STRING
         Field stringField = new Field("str", FieldType.nullable(ArrowType.Utf8.INSTANCE), null);
@@ -111,7 +111,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow Boolean 类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow Boolean type to Flink type mapping")
     void testArrowBoolToFlinkType() {
         Field boolField = new Field("bool", FieldType.nullable(ArrowType.Bool.INSTANCE), null);
         LogicalType boolType = LanceTypeConverter.arrowTypeToFlinkType(boolField);
@@ -119,7 +119,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow Binary 类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow Binary type to Flink type mapping")
     void testArrowBinaryToFlinkType() {
         Field binaryField = new Field("binary", FieldType.nullable(ArrowType.Binary.INSTANCE), null);
         LogicalType binaryType = LanceTypeConverter.arrowTypeToFlinkType(binaryField);
@@ -127,7 +127,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow Date 类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow Date type to Flink type mapping")
     void testArrowDateToFlinkType() {
         Field dateField = new Field("date", 
                 FieldType.nullable(new ArrowType.Date(DateUnit.DAY)), null);
@@ -136,16 +136,16 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow Timestamp 类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow Timestamp type to Flink type mapping")
     void testArrowTimestampToFlinkType() {
-        // 毫秒精度
+        // Millisecond precision
         Field tsMilliField = new Field("ts_milli", 
                 FieldType.nullable(new ArrowType.Timestamp(TimeUnit.MILLISECOND, null)), null);
         LogicalType tsMilliType = LanceTypeConverter.arrowTypeToFlinkType(tsMilliField);
         assertThat(tsMilliType).isInstanceOf(TimestampType.class);
         assertThat(((TimestampType) tsMilliType).getPrecision()).isEqualTo(3);
 
-        // 微秒精度
+        // Microsecond precision
         Field tsMicroField = new Field("ts_micro", 
                 FieldType.nullable(new ArrowType.Timestamp(TimeUnit.MICROSECOND, null)), null);
         LogicalType tsMicroType = LanceTypeConverter.arrowTypeToFlinkType(tsMicroField);
@@ -154,7 +154,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow FixedSizeList (向量) 类型到 Flink 类型的映射")
+    @DisplayName("Test Arrow FixedSizeList (vector) type to Flink type mapping")
     void testArrowVectorToFlinkType() {
         // FixedSizeList<Float32> -> ARRAY<FLOAT>
         ArrowType elementType = new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE);
@@ -170,7 +170,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Flink 类型到 Arrow 类型的映射")
+    @DisplayName("Test Flink type to Arrow type mapping")
     void testFlinkTypeToArrowType() {
         // TINYINT -> Int8
         Field tinyIntField = LanceTypeConverter.flinkTypeToArrowField("tinyint", new TinyIntType());
@@ -209,7 +209,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Arrow Schema 到 Flink RowType 的转换")
+    @DisplayName("Test Arrow Schema to Flink RowType conversion")
     void testArrowSchemaToFlinkRowType() {
         List<Field> fields = new ArrayList<>();
         fields.add(new Field("id", FieldType.notNullable(new ArrowType.Int(64, true)), null));
@@ -228,7 +228,7 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试 Flink RowType 到 Arrow Schema 的转换")
+    @DisplayName("Test Flink RowType to Arrow Schema conversion")
     void testFlinkRowTypeToArrowSchema() {
         List<RowType.RowField> fields = new ArrayList<>();
         fields.add(new RowType.RowField("id", new BigIntType(false)));
@@ -245,16 +245,16 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试向量字段创建")
+    @DisplayName("Test vector field creation")
     void testCreateVectorField() {
-        // Float32 向量
+        // Float32 vector
         Field float32Vector = LanceTypeConverter.createVectorField("embedding", 128, false);
         assertThat(float32Vector.getName()).isEqualTo("embedding");
         assertThat(float32Vector.getType()).isInstanceOf(ArrowType.FixedSizeList.class);
         assertThat(((ArrowType.FixedSizeList) float32Vector.getType()).getListSize()).isEqualTo(128);
         assertThat(float32Vector.isNullable()).isFalse();
 
-        // Float64 向量
+        // Float64 vector
         Field float64Vector = LanceTypeConverter.createFloat64VectorField("embedding64", 256, true);
         assertThat(float64Vector.getName()).isEqualTo("embedding64");
         assertThat(((ArrowType.FixedSizeList) float64Vector.getType()).getListSize()).isEqualTo(256);
@@ -262,35 +262,35 @@ class LanceTypeConverterTest {
     }
 
     @Test
-    @DisplayName("测试向量字段检测")
+    @DisplayName("Test vector field detection")
     void testIsVectorField() {
-        // 创建向量字段
+        // Create vector field
         Field vectorField = LanceTypeConverter.createVectorField("embedding", 128, false);
         assertThat(LanceTypeConverter.isVectorField(vectorField)).isTrue();
         assertThat(LanceTypeConverter.getVectorDimension(vectorField)).isEqualTo(128);
 
-        // 非向量字段
+        // Non-vector field
         Field intField = new Field("id", FieldType.notNullable(new ArrowType.Int(64, true)), null);
         assertThat(LanceTypeConverter.isVectorField(intField)).isFalse();
         assertThat(LanceTypeConverter.getVectorDimension(intField)).isEqualTo(-1);
     }
 
     @Test
-    @DisplayName("测试不支持的类型异常")
+    @DisplayName("Test unsupported type exception")
     void testUnsupportedTypeException() {
-        // 不支持的 Arrow 类型
+        // Unsupported Arrow type
         Field unsupportedField = new Field("unsupported", 
                 FieldType.nullable(new ArrowType.Duration(TimeUnit.SECOND)), null);
         
         assertThatThrownBy(() -> LanceTypeConverter.arrowTypeToFlinkType(unsupportedField))
                 .isInstanceOf(LanceTypeConverter.UnsupportedTypeException.class)
-                .hasMessageContaining("不支持的 Arrow 类型");
+                .hasMessageContaining("Unsupported Arrow type");
     }
 
     @Test
-    @DisplayName("测试双向转换的一致性")
+    @DisplayName("Test round-trip conversion consistency")
     void testRoundTripConversion() {
-        // 创建 Flink RowType
+        // Create Flink RowType
         List<RowType.RowField> fields = new ArrayList<>();
         fields.add(new RowType.RowField("id", new BigIntType(false)));
         fields.add(new RowType.RowField("name", new VarCharType()));
@@ -303,11 +303,11 @@ class LanceTypeConverterTest {
         Schema arrowSchema = LanceTypeConverter.toArrowSchema(originalRowType);
         RowType convertedRowType = LanceTypeConverter.toFlinkRowType(arrowSchema);
 
-        // 验证字段数量和名称
+        // Verify field count and names
         assertThat(convertedRowType.getFieldCount()).isEqualTo(originalRowType.getFieldCount());
         assertThat(convertedRowType.getFieldNames()).isEqualTo(originalRowType.getFieldNames());
 
-        // 验证类型（类型类应该匹配）
+        // Verify types (type classes should match)
         for (int i = 0; i < originalRowType.getFieldCount(); i++) {
             assertThat(convertedRowType.getTypeAt(i).getClass())
                     .isEqualTo(originalRowType.getTypeAt(i).getClass());

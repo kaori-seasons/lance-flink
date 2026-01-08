@@ -48,9 +48,9 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Lance InputFormat 实现。
+ * Lance InputFormat implementation.
  * 
- * <p>使用 InputFormat 接口从 Lance 数据集读取数据，支持分片并行读取。
+ * <p>Reads data from Lance dataset using InputFormat interface, supports parallel reading with splits.
  */
 public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
 
@@ -70,9 +70,9 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
     private transient boolean reachedEnd;
 
     /**
-     * 创建 LanceInputFormat
+     * Create LanceInputFormat
      *
-     * @param options Lance 配置选项
+     * @param options Lance configuration options
      * @param rowType Flink RowType
      */
     public LanceInputFormat(LanceOptions options, RowType rowType) {
@@ -87,22 +87,22 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
 
     @Override
     public void configure(Configuration parameters) {
-        // 配置已在构造函数中完成
+        // Configuration already done in constructor
     }
 
     @Override
     public BaseStatistics getStatistics(BaseStatistics cachedStatistics) throws IOException {
-        // 返回基础统计信息
+        // Return basic statistics
         return cachedStatistics;
     }
 
     @Override
     public LanceSplit[] createInputSplits(int minNumSplits) throws IOException {
-        LOG.info("创建输入分片，最小分片数: {}", minNumSplits);
+        LOG.info("Creating input splits, minimum split count: {}", minNumSplits);
         
         String datasetPath = options.getPath();
         if (datasetPath == null || datasetPath.isEmpty()) {
-            throw new IOException("数据集路径不能为空");
+            throw new IOException("Dataset path cannot be empty");
         }
 
         BufferAllocator tempAllocator = new RootAllocator(Long.MAX_VALUE);
@@ -118,7 +118,7 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
                     splits[i] = new LanceSplit(i, fragment.getId(), datasetPath, rowCount);
                 }
                 
-                LOG.info("创建了 {} 个输入分片", splits.length);
+                LOG.info("Created {} input splits", splits.length);
                 return splits;
             } finally {
                 tempDataset.close();
@@ -135,20 +135,20 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
 
     @Override
     public void open(LanceSplit split) throws IOException {
-        LOG.info("打开分片: {}", split);
+        LOG.info("Opening split: {}", split);
         
         this.allocator = new RootAllocator(Long.MAX_VALUE);
         this.reachedEnd = false;
         
-        // 打开数据集
+        // Open dataset
         String datasetPath = split.getDatasetPath();
         try {
             this.dataset = Dataset.open(datasetPath, allocator);
         } catch (Exception e) {
-            throw new IOException("无法打开数据集: " + datasetPath, e);
+            throw new IOException("Cannot open dataset: " + datasetPath, e);
         }
         
-        // 初始化转换器
+        // Initialize converter
         RowType actualRowType = this.rowType;
         if (actualRowType == null) {
             Schema arrowSchema = dataset.getSchema();
@@ -156,7 +156,7 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
         }
         this.converter = new RowDataConverter(actualRowType);
         
-        // 获取指定的 Fragment
+        // Get specified Fragment
         List<Fragment> fragments = dataset.getFragments();
         Fragment targetFragment = null;
         for (Fragment fragment : fragments) {
@@ -167,10 +167,10 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
         }
         
         if (targetFragment == null) {
-            throw new IOException("找不到 Fragment: " + split.getFragmentId());
+            throw new IOException("Cannot find Fragment: " + split.getFragmentId());
         }
         
-        // 构建扫描选项
+        // Build scan options
         ScanOptions.Builder scanOptionsBuilder = new ScanOptions.Builder();
         scanOptionsBuilder.batchSize(options.getReadBatchSize());
         
@@ -185,20 +185,20 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
         
         ScanOptions scanOptions = scanOptionsBuilder.build();
         
-        // 创建 Scanner
+        // Create Scanner
         try {
             this.currentScanner = targetFragment.newScan(scanOptions);
             this.currentReader = currentScanner.scanBatches();
         } catch (Exception e) {
-            throw new IOException("创建 Scanner 失败", e);
+            throw new IOException("Failed to create Scanner", e);
         }
         
-        // 加载第一批数据
+        // Load first batch of data
         loadNextBatch();
     }
 
     /**
-     * 加载下一批数据
+     * Load next batch of data
      */
     private void loadNextBatch() throws IOException {
         try {
@@ -211,7 +211,7 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
                 this.currentBatchIterator = null;
             }
         } catch (Exception e) {
-            throw new IOException("加载数据批次失败", e);
+            throw new IOException("Failed to load data batch", e);
         }
     }
 
@@ -226,12 +226,12 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
             return null;
         }
         
-        // 当前批次还有数据
+        // Current batch still has data
         if (currentBatchIterator != null && currentBatchIterator.hasNext()) {
             return currentBatchIterator.next();
         }
         
-        // 加载下一批
+        // Load next batch
         loadNextBatch();
         
         if (reachedEnd) {
@@ -247,13 +247,13 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
 
     @Override
     public void close() throws IOException {
-        LOG.info("关闭 LanceInputFormat");
+        LOG.info("Closing LanceInputFormat");
         
         if (currentReader != null) {
             try {
                 currentReader.close();
             } catch (Exception e) {
-                LOG.warn("关闭 Reader 失败", e);
+                LOG.warn("Failed to close Reader", e);
             }
             currentReader = null;
         }
@@ -262,7 +262,7 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
             try {
                 currentScanner.close();
             } catch (Exception e) {
-                LOG.warn("关闭 Scanner 失败", e);
+                LOG.warn("Failed to close Scanner", e);
             }
             currentScanner = null;
         }
@@ -271,7 +271,7 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
             try {
                 dataset.close();
             } catch (Exception e) {
-                LOG.warn("关闭数据集失败", e);
+                LOG.warn("Failed to close dataset", e);
             }
             dataset = null;
         }
@@ -280,28 +280,28 @@ public class LanceInputFormat extends RichInputFormat<RowData, LanceSplit> {
             try {
                 allocator.close();
             } catch (Exception e) {
-                LOG.warn("关闭分配器失败", e);
+                LOG.warn("Failed to close allocator", e);
             }
             allocator = null;
         }
     }
 
     /**
-     * 获取 RowType
+     * Get RowType
      */
     public RowType getRowType() {
         return rowType;
     }
 
     /**
-     * 获取配置选项
+     * Get configuration options
      */
     public LanceOptions getOptions() {
         return options;
     }
 
     /**
-     * Lance 分片分配器
+     * Lance split assigner
      */
     private static class LanceSplitAssigner implements InputSplitAssigner {
         private final List<LanceSplit> remainingSplits;

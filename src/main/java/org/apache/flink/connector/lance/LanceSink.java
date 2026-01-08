@@ -51,11 +51,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Lance Sink 实现。
+ * Lance Sink implementation.
  * 
- * <p>将 Flink RowData 写入 Lance 数据集，支持批量写入和 Checkpoint。
+ * <p>Writes Flink RowData to Lance dataset, supports batch writing and Checkpoint.
  * 
- * <p>使用示例：
+ * <p>Usage example:
  * <pre>{@code
  * LanceOptions options = LanceOptions.builder()
  *     .path("/path/to/lance/dataset")
@@ -85,9 +85,9 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
     private transient boolean isFirstWrite;
 
     /**
-     * 创建 LanceSink
+     * Create LanceSink
      *
-     * @param options Lance 配置选项
+     * @param options Lance configuration options
      * @param rowType Flink RowType
      */
     public LanceSink(LanceOptions options, RowType rowType) {
@@ -99,68 +99,68 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
         
-        LOG.info("打开 Lance Sink: {}", options.getPath());
+        LOG.info("Opening Lance Sink: {}", options.getPath());
         
         this.allocator = new RootAllocator(Long.MAX_VALUE);
         this.buffer = new ArrayList<>(options.getWriteBatchSize());
         this.totalWrittenRows = 0;
         this.isFirstWrite = true;
         
-        // 初始化转换器和 Schema
+        // Initialize converter and Schema
         this.converter = new RowDataConverter(rowType);
         this.arrowSchema = LanceTypeConverter.toArrowSchema(rowType);
         
-        // 检查数据集是否存在
+        // Check if dataset exists
         String datasetPath = options.getPath();
         if (datasetPath == null || datasetPath.isEmpty()) {
-            throw new IllegalArgumentException("Lance 数据集路径不能为空");
+            throw new IllegalArgumentException("Lance dataset path cannot be empty");
         }
         
         Path path = Paths.get(datasetPath);
         this.datasetExists = Files.exists(path);
         
-        // 如果是覆盖模式且数据集存在，先删除
+        // If overwrite mode and dataset exists, delete first
         if (datasetExists && options.getWriteMode() == LanceOptions.WriteMode.OVERWRITE) {
-            LOG.info("覆盖模式，删除现有数据集: {}", datasetPath);
+            LOG.info("Overwrite mode, deleting existing dataset: {}", datasetPath);
             deleteDirectory(path);
             this.datasetExists = false;
         }
         
-        LOG.info("Lance Sink 已打开，Schema: {}", rowType);
+        LOG.info("Lance Sink opened, Schema: {}", rowType);
     }
 
     @Override
     public void invoke(RowData value, Context context) throws Exception {
         buffer.add(value);
         
-        // 当缓冲区达到批次大小时，执行写入
+        // When buffer reaches batch size, execute write
         if (buffer.size() >= options.getWriteBatchSize()) {
             flush();
         }
     }
 
     /**
-     * 刷新缓冲区，将数据写入 Lance 数据集
+     * Flush buffer, write data to Lance dataset
      */
     public void flush() throws IOException {
         if (buffer.isEmpty()) {
             return;
         }
         
-        LOG.debug("刷新缓冲区，行数: {}", buffer.size());
+        LOG.debug("Flushing buffer, row count: {}", buffer.size());
         
         try (VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator)) {
-            // 将 RowData 转换为 VectorSchemaRoot
+            // Convert RowData to VectorSchemaRoot
             converter.toVectorSchemaRoot(buffer, root);
             
             String datasetPath = options.getPath();
             
-            // 构建写入参数
+            // Build write parameters
             WriteParams writeParams = new WriteParams.Builder()
                     .withMaxRowsPerFile(options.getWriteMaxRowsPerFile())
                     .build();
             
-            // 创建 Fragment
+            // Create Fragment
             List<FragmentMetadata> fragments = Fragment.create(
                     datasetPath,
                     allocator,
@@ -169,49 +169,49 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
             );
             
             if (!datasetExists) {
-                // 创建新数据集（使用 Overwrite 操作）
+                // Create new dataset (using Overwrite operation)
                 FragmentOperation.Overwrite overwrite = new FragmentOperation.Overwrite(fragments, arrowSchema);
                 dataset = overwrite.commit(allocator, datasetPath, Optional.empty(), Collections.emptyMap());
                 datasetExists = true;
                 isFirstWrite = false;
-                LOG.info("创建新数据集: {}", datasetPath);
+                LOG.info("Created new dataset: {}", datasetPath);
             } else {
-                // 追加数据
+                // Append data
                 if (isFirstWrite && options.getWriteMode() == LanceOptions.WriteMode.OVERWRITE) {
-                    // 第一次写入且为覆盖模式
+                    // First write and overwrite mode
                     FragmentOperation.Overwrite overwrite = new FragmentOperation.Overwrite(fragments, arrowSchema);
                     dataset = overwrite.commit(allocator, datasetPath, Optional.empty(), Collections.emptyMap());
                     isFirstWrite = false;
                 } else {
-                    // 追加模式
+                    // Append mode
                     FragmentOperation.Append append = new FragmentOperation.Append(fragments);
                     dataset = append.commit(allocator, datasetPath, Optional.empty(), Collections.emptyMap());
                 }
             }
             
             totalWrittenRows += buffer.size();
-            LOG.debug("已写入 {} 行，总计: {} 行", buffer.size(), totalWrittenRows);
+            LOG.debug("Written {} rows, total: {} rows", buffer.size(), totalWrittenRows);
             
             buffer.clear();
         } catch (Exception e) {
-            throw new IOException("写入 Lance 数据集失败", e);
+            throw new IOException("Failed to write Lance dataset", e);
         }
     }
 
     @Override
     public void close() throws Exception {
-        LOG.info("关闭 Lance Sink");
-        // 刷新剩余数据
+        LOG.info("Closing Lance Sink");
+        // Flush remaining data
         try {
             flush();
         } catch (Exception e) {
-            LOG.warn("关闭时刷新数据失败", e);
+            LOG.warn("Failed to flush data on close", e);
         }
         if (dataset != null) {
             try {
                 dataset.close();
             } catch (Exception e) {
-                LOG.warn("关闭数据集失败", e);
+                LOG.warn("Failed to close dataset", e);
             }
             dataset = null;
         }
@@ -220,53 +220,53 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
             try {
                 allocator.close();
             } catch (Exception e) {
-                LOG.warn("关闭分配器失败", e);
+                LOG.warn("Failed to close allocator", e);
             }
             allocator = null;
         }
         
-        LOG.info("Lance Sink 已关闭，总计写入 {} 行", totalWrittenRows);
+        LOG.info("Lance Sink closed, total written {} rows", totalWrittenRows);
         
         super.close();
     }
 
     @Override
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
-        LOG.debug("快照状态，checkpointId: {}", context.getCheckpointId());
+        LOG.debug("Snapshot state, checkpointId: {}", context.getCheckpointId());
         
-        // 在 Checkpoint 时刷新所有缓冲数据
+        // Flush all buffered data at Checkpoint
         flush();
     }
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
-        LOG.debug("初始化状态，isRestored: {}", context.isRestored());
-        // 状态初始化（如果需要恢复）
+        LOG.debug("Initialize state, isRestored: {}", context.isRestored());
+        // State initialization (if recovery needed)
     }
 
     /**
-     * 获取 RowType
+     * Get RowType
      */
     public RowType getRowType() {
         return rowType;
     }
 
     /**
-     * 获取配置选项
+     * Get configuration options
      */
     public LanceOptions getOptions() {
         return options;
     }
 
     /**
-     * 获取已写入的总行数
+     * Get total written row count
      */
     public long getTotalWrittenRows() {
         return totalWrittenRows;
     }
 
     /**
-     * 递归删除目录
+     * Recursively delete directory
      */
     private void deleteDirectory(Path path) throws IOException {
         if (Files.isDirectory(path)) {
@@ -274,7 +274,7 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
                 try {
                     deleteDirectory(child);
                 } catch (IOException e) {
-                    LOG.warn("删除文件失败: {}", child, e);
+                    LOG.warn("Failed to delete file: {}", child, e);
                 }
             });
         }
@@ -282,14 +282,14 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
     }
 
     /**
-     * Builder 模式构建器
+     * Builder pattern constructor
      */
     public static Builder builder() {
         return new Builder();
     }
 
     /**
-     * LanceSink 构建器
+     * LanceSink Builder
      */
     public static class Builder {
         private String path;
@@ -325,11 +325,11 @@ public class LanceSink extends RichSinkFunction<RowData> implements Checkpointed
 
         public LanceSink build() {
             if (path == null || path.isEmpty()) {
-                throw new IllegalArgumentException("数据集路径不能为空");
+                throw new IllegalArgumentException("Dataset path cannot be empty");
             }
             
             if (rowType == null) {
-                throw new IllegalArgumentException("RowType 不能为空");
+                throw new IllegalArgumentException("RowType cannot be null");
             }
 
             LanceOptions options = LanceOptions.builder()

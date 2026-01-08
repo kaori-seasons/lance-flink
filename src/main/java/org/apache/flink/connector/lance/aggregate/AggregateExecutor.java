@@ -21,7 +21,6 @@ package org.apache.flink.connector.lance.aggregate;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
@@ -32,8 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,9 +40,9 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 聚合执行器。
+ * Aggregate executor.
  * 
- * <p>在数据源端执行聚合计算，支持 COUNT、SUM、AVG、MIN、MAX 等聚合函数。
+ * <p>Executes aggregate calculations at data source side, supports COUNT, SUM, AVG, MIN, MAX and other aggregate functions.
  */
 public class AggregateExecutor implements Serializable {
 
@@ -55,7 +52,7 @@ public class AggregateExecutor implements Serializable {
     private final AggregateInfo aggregateInfo;
     private final RowType sourceRowType;
 
-    // 聚合状态（按分组键）
+    // Aggregate state (by group key)
     private transient Map<GroupKey, AggregateState> aggregateStates;
     private transient boolean initialized;
 
@@ -65,30 +62,30 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 初始化聚合执行器
+     * Initialize aggregate executor
      */
     public void init() {
         this.aggregateStates = new HashMap<>();
         this.initialized = true;
-        LOG.info("初始化聚合执行器: {}", aggregateInfo);
+        LOG.info("Initialized aggregate executor: {}", aggregateInfo);
     }
 
     /**
-     * 累积一行数据到聚合状态
+     * Accumulate a row to aggregate state
      */
     public void accumulate(RowData row) {
         if (!initialized) {
             init();
         }
 
-        // 提取分组键
+        // Extract group key
         GroupKey groupKey = extractGroupKey(row);
         
-        // 获取或创建聚合状态
+        // Get or create aggregate state
         AggregateState state = aggregateStates.computeIfAbsent(groupKey, 
                 k -> new AggregateState(aggregateInfo.getAggregateCalls().size()));
 
-        // 更新每个聚合函数的状态
+        // Update state for each aggregate function
         List<AggregateInfo.AggregateCall> calls = aggregateInfo.getAggregateCalls();
         for (int i = 0; i < calls.size(); i++) {
             AggregateInfo.AggregateCall call = calls.get(i);
@@ -97,7 +94,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 累积单个聚合函数
+     * Accumulate single aggregate function
      */
     private void accumulateCall(AggregateState state, int index, 
                                  AggregateInfo.AggregateCall call, RowData row) {
@@ -107,7 +104,7 @@ public class AggregateExecutor implements Serializable {
                     // COUNT(*)
                     state.incrementCount(index);
                 } else {
-                    // COUNT(column) - 只计数非 NULL 值
+                    // COUNT(column) - only count non-NULL values
                     int fieldIndex = getFieldIndex(call.getColumn());
                     if (fieldIndex >= 0 && !row.isNullAt(fieldIndex)) {
                         state.incrementCount(index);
@@ -176,11 +173,11 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 获取聚合结果
+     * Get aggregate results
      */
     public List<RowData> getResults() {
         if (!initialized || aggregateStates.isEmpty()) {
-            // 如果没有数据，返回默认聚合结果
+            // If no data, return default aggregate result
             return getDefaultResults();
         }
 
@@ -192,16 +189,16 @@ public class AggregateExecutor implements Serializable {
             GroupKey groupKey = entry.getKey();
             AggregateState state = entry.getValue();
 
-            // 创建结果行：分组列 + 聚合列
+            // Create result row: group columns + aggregate columns
             int totalFields = groupByCols.size() + calls.size();
             GenericRowData resultRow = new GenericRowData(totalFields);
 
-            // 填充分组列
+            // Fill group columns
             for (int i = 0; i < groupByCols.size(); i++) {
                 resultRow.setField(i, groupKey.getValues()[i]);
             }
 
-            // 填充聚合结果
+            // Fill aggregate results
             for (int i = 0; i < calls.size(); i++) {
                 AggregateInfo.AggregateCall call = calls.get(i);
                 Object aggResult = getAggregateResult(state, i, call);
@@ -211,20 +208,20 @@ public class AggregateExecutor implements Serializable {
             results.add(resultRow);
         }
 
-        LOG.info("聚合执行完成，生成 {} 个结果行", results.size());
+        LOG.info("Aggregate execution completed, generated {} result rows", results.size());
         return results;
     }
 
     /**
-     * 获取无数据时的默认聚合结果
+     * Get default aggregate result when no data
      */
     private List<RowData> getDefaultResults() {
-        // 如果有 GROUP BY，没有数据就没有结果
+        // If has GROUP BY, no data means no result
         if (aggregateInfo.hasGroupBy()) {
             return new ArrayList<>();
         }
 
-        // 没有 GROUP BY，返回默认聚合值
+        // No GROUP BY, return default aggregate values
         List<AggregateInfo.AggregateCall> calls = aggregateInfo.getAggregateCalls();
         GenericRowData resultRow = new GenericRowData(calls.size());
 
@@ -247,7 +244,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 获取单个聚合函数的结果
+     * Get single aggregate function result
      */
     private Object getAggregateResult(AggregateState state, int index, 
                                        AggregateInfo.AggregateCall call) {
@@ -272,7 +269,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 提取分组键
+     * Extract group key
      */
     private GroupKey extractGroupKey(RowData row) {
         List<String> groupByCols = aggregateInfo.getGroupByColumns();
@@ -291,7 +288,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 获取字段索引
+     * Get field index
      */
     private int getFieldIndex(String columnName) {
         List<String> fieldNames = sourceRowType.getFieldNames();
@@ -299,7 +296,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 提取字段值
+     * Extract field value
      */
     private Object extractValue(RowData row, int fieldIndex) {
         if (row.isNullAt(fieldIndex)) {
@@ -324,7 +321,7 @@ public class AggregateExecutor implements Serializable {
                 return row.getDouble(fieldIndex);
             case CHAR:
             case VARCHAR:
-                // 保留 StringData 类型，用于分组键和结果输出
+                // Keep StringData type for group key and result output
                 return row.getString(fieldIndex);
             case DECIMAL:
                 DecimalType decType = (DecimalType) fieldType;
@@ -336,7 +333,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 提取数值类型字段值
+     * Extract numeric type field value
      */
     private Number extractNumericValue(RowData row, int fieldIndex) {
         if (row.isNullAt(fieldIndex)) {
@@ -367,7 +364,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 提取可比较类型字段值
+     * Extract comparable type field value
      */
     @SuppressWarnings("unchecked")
     private Comparable<?> extractComparableValue(RowData row, int fieldIndex) {
@@ -379,7 +376,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 重置聚合状态
+     * Reset aggregate state
      */
     public void reset() {
         if (aggregateStates != null) {
@@ -388,7 +385,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 分组键
+     * Group key
      */
     private static class GroupKey implements Serializable {
         private static final long serialVersionUID = 1L;
@@ -422,14 +419,14 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 聚合状态
+     * Aggregate state
      */
     private static class AggregateState implements Serializable {
         private static final long serialVersionUID = 1L;
 
         private final long[] counts;
         private final double[] sums;
-        private final long[] avgCounts;  // 用于计算 AVG
+        private final long[] avgCounts;  // For calculating AVG
         private final Comparable<?>[] mins;
         private final Comparable<?>[] maxs;
         private final Set<Object>[] distinctSets;
@@ -465,7 +462,7 @@ public class AggregateExecutor implements Serializable {
 
         void addSum(int index, double value) {
             sums[index] += value;
-            counts[index]++;  // 标记有值
+            counts[index]++;  // Mark as has value
         }
 
         Double getSum(int index) {
@@ -505,7 +502,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 构建聚合结果的 RowType
+     * Build aggregate result RowType
      */
     public RowType buildResultRowType() {
         List<String> groupByCols = aggregateInfo.getGroupByColumns();
@@ -513,7 +510,7 @@ public class AggregateExecutor implements Serializable {
 
         List<RowType.RowField> fields = new ArrayList<>();
 
-        // 分组列
+        // Group columns
         for (String col : groupByCols) {
             int fieldIndex = getFieldIndex(col);
             if (fieldIndex >= 0) {
@@ -522,7 +519,7 @@ public class AggregateExecutor implements Serializable {
             }
         }
 
-        // 聚合结果列
+        // Aggregate result columns
         for (AggregateInfo.AggregateCall call : calls) {
             String alias = call.getAlias() != null ? call.getAlias() : 
                     call.getFunction().name().toLowerCase() + "_" + 
@@ -535,7 +532,7 @@ public class AggregateExecutor implements Serializable {
     }
 
     /**
-     * 获取聚合函数的结果类型
+     * Get aggregate function result type
      */
     private LogicalType getAggregateResultType(AggregateInfo.AggregateCall call) {
         switch (call.getFunction()) {

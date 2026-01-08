@@ -44,7 +44,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Lance SQL 集成测试。
+ * Lance SQL integration tests.
  */
 class LanceSqlITCase {
 
@@ -61,14 +61,14 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableFactory 标识符")
+    @DisplayName("Test LanceDynamicTableFactory identifier")
     void testFactoryIdentifier() {
         LanceDynamicTableFactory factory = new LanceDynamicTableFactory();
         assertThat(factory.factoryIdentifier()).isEqualTo("lance");
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableFactory 必需选项")
+    @DisplayName("Test LanceDynamicTableFactory required options")
     void testRequiredOptions() {
         LanceDynamicTableFactory factory = new LanceDynamicTableFactory();
         Set<String> requiredOptionKeys = new HashSet<>();
@@ -78,7 +78,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableFactory 可选选项")
+    @DisplayName("Test LanceDynamicTableFactory optional options")
     void testOptionalOptions() {
         LanceDynamicTableFactory factory = new LanceDynamicTableFactory();
         Set<String> optionalOptionKeys = new HashSet<>();
@@ -99,7 +99,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableSource 创建")
+    @DisplayName("Test LanceDynamicTableSource creation")
     void testDynamicTableSourceCreation() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
@@ -126,7 +126,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableSink 创建")
+    @DisplayName("Test LanceDynamicTableSink creation")
     void testDynamicTableSinkCreation() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
@@ -148,7 +148,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableSource 复制")
+    @DisplayName("Test LanceDynamicTableSource copy")
     void testDynamicTableSourceCopy() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
@@ -166,7 +166,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceDynamicTableSink 复制")
+    @DisplayName("Test LanceDynamicTableSink copy")
     void testDynamicTableSinkCopy() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
@@ -184,14 +184,14 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceCatalogFactory 标识符")
+    @DisplayName("Test LanceCatalogFactory identifier")
     void testCatalogFactoryIdentifier() {
         LanceCatalogFactory factory = new LanceCatalogFactory();
         assertThat(factory.factoryIdentifier()).isEqualTo("lance");
     }
 
     @Test
-    @DisplayName("测试 LanceCatalogFactory 必需选项")
+    @DisplayName("Test LanceCatalogFactory required options")
     void testCatalogRequiredOptions() {
         LanceCatalogFactory factory = new LanceCatalogFactory();
         Set<String> requiredOptionKeys = new HashSet<>();
@@ -201,7 +201,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceCatalogFactory 可选选项")
+    @DisplayName("Test LanceCatalogFactory optional options")
     void testCatalogOptionalOptions() {
         LanceCatalogFactory factory = new LanceCatalogFactory();
         Set<String> optionalOptionKeys = new HashSet<>();
@@ -211,29 +211,29 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceCatalog 创建和基本操作")
+    @DisplayName("Test LanceCatalog creation and basic operations")
     void testLanceCatalogBasicOperations() throws Exception {
         LanceCatalog catalog = new LanceCatalog("test_catalog", "default", warehousePath);
         
         try {
             catalog.open();
             
-            // 验证默认数据库存在
+            // Verify default database exists
             assertThat(catalog.databaseExists("default")).isTrue();
             
-            // 列举数据库
+            // List databases
             List<String> databases = catalog.listDatabases();
             assertThat(databases).contains("default");
             
-            // 创建新数据库
+            // Create new database
             catalog.createDatabase("test_db", null, false);
             assertThat(catalog.databaseExists("test_db")).isTrue();
             
-            // 列举表（空）
+            // List tables (empty)
             List<String> tables = catalog.listTables("test_db");
             assertThat(tables).isEmpty();
             
-            // 删除数据库
+            // Drop database
             catalog.dropDatabase("test_db", false, true);
             assertThat(catalog.databaseExists("test_db")).isFalse();
             
@@ -243,7 +243,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 LanceCatalog 仓库路径")
+    @DisplayName("Test LanceCatalog warehouse path")
     void testLanceCatalogWarehouse() throws Exception {
         LanceCatalog catalog = new LanceCatalog("test", "default", warehousePath);
         
@@ -256,7 +256,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试配置选项定义")
+    @DisplayName("Test configuration options definition")
     void testConfigOptions() {
         assertThat(LanceDynamicTableFactory.PATH.key()).isEqualTo("path");
         assertThat(LanceDynamicTableFactory.READ_BATCH_SIZE.key()).isEqualTo("read.batch-size");
@@ -271,7 +271,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 Catalog 配置选项定义")
+    @DisplayName("Test Catalog configuration options definition")
     void testCatalogConfigOptions() {
         assertThat(LanceCatalogFactory.WAREHOUSE.key()).isEqualTo("warehouse");
         assertThat(LanceCatalogFactory.DEFAULT_DATABASE.key()).isEqualTo("default-database");
@@ -279,9 +279,9 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试 S3 Catalog 配置选项定义")
+    @DisplayName("Test S3 Catalog configuration options definition")
     void testS3CatalogConfigOptions() {
-        // S3 配置选项
+        // S3 configuration options
         assertThat(LanceCatalogFactory.S3_ACCESS_KEY.key()).isEqualTo("s3-access-key");
         assertThat(LanceCatalogFactory.S3_SECRET_KEY.key()).isEqualTo("s3-secret-key");
         assertThat(LanceCatalogFactory.S3_REGION.key()).isEqualTo("s3-region");
@@ -289,37 +289,37 @@ class LanceSqlITCase {
         assertThat(LanceCatalogFactory.S3_VIRTUAL_HOSTED_STYLE.key()).isEqualTo("s3-virtual-hosted-style");
         assertThat(LanceCatalogFactory.S3_ALLOW_HTTP.key()).isEqualTo("s3-allow-http");
         
-        // 默认值
+        // Default values
         assertThat(LanceCatalogFactory.S3_VIRTUAL_HOSTED_STYLE.defaultValue()).isTrue();
         assertThat(LanceCatalogFactory.S3_ALLOW_HTTP.defaultValue()).isFalse();
     }
 
     @Test
-    @DisplayName("测试 LanceCatalog S3 远程存储识别")
+    @DisplayName("Test LanceCatalog S3 remote storage detection")
     void testLanceCatalogRemoteStorageDetection() {
-        // S3 路径应该被识别为远程存储
+        // S3 path should be identified as remote storage
         LanceCatalog s3Catalog = new LanceCatalog("test", "default", "s3://bucket/path");
         assertThat(s3Catalog.isRemoteStorage()).isTrue();
         
-        // S3A 路径
+        // S3A path
         LanceCatalog s3aCatalog = new LanceCatalog("test", "default", "s3a://bucket/path");
         assertThat(s3aCatalog.isRemoteStorage()).isTrue();
         
-        // GCS 路径
+        // GCS path
         LanceCatalog gcsCatalog = new LanceCatalog("test", "default", "gs://bucket/path");
         assertThat(gcsCatalog.isRemoteStorage()).isTrue();
         
-        // Azure 路径
+        // Azure path
         LanceCatalog azCatalog = new LanceCatalog("test", "default", "az://container/path");
         assertThat(azCatalog.isRemoteStorage()).isTrue();
         
-        // 本地路径应该被识别为本地存储
+        // Local path should be identified as local storage
         LanceCatalog localCatalog = new LanceCatalog("test", "default", warehousePath);
         assertThat(localCatalog.isRemoteStorage()).isFalse();
     }
 
     @Test
-    @DisplayName("测试 LanceCatalog 带存储选项构造")
+    @DisplayName("Test LanceCatalog construction with storage options")
     void testLanceCatalogWithStorageOptions() {
         Map<String, String> storageOptions = new HashMap<>();
         storageOptions.put("aws_access_key_id", "test-key");
@@ -339,7 +339,7 @@ class LanceSqlITCase {
     }
 
     @Test
-    @DisplayName("测试向量检索 UDF 配置")
+    @DisplayName("Test vector search UDF configuration")
     void testVectorSearchFunctionConfiguration() {
         LanceVectorSearchFunction function = new LanceVectorSearchFunction();
         assertThat(function).isNotNull();

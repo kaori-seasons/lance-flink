@@ -46,23 +46,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Lance Catalog S3 集成测试。
+ * Lance Catalog S3 integration tests.
  * 
- * <p>本测试类分为两部分：
+ * <p>This test class is divided into two parts:
  * <ul>
- *   <li>不需要 MinIO 连接的单元测试（始终运行）</li>
- *   <li>需要 MinIO 连接的集成测试（需要配置外部 MinIO 服务）</li>
+ *   <li>Unit tests that don't require MinIO connection (always run)</li>
+ *   <li>Integration tests that require MinIO connection (require external MinIO service configuration)</li>
  * </ul>
  * 
- * <p>要运行需要 MinIO 的测试，请设置以下环境变量：
+ * <p>To run tests that require MinIO, set the following environment variables:
  * <ul>
- *   <li>MINIO_ENDPOINT - MinIO 服务地址，例如 http://localhost:9000</li>
- *   <li>MINIO_ACCESS_KEY - MinIO 访问密钥（默认：minioadmin）</li>
- *   <li>MINIO_SECRET_KEY - MinIO 密钥（默认：minioadmin）</li>
- *   <li>MINIO_BUCKET - 测试用 bucket 名称（默认：lance-test-bucket）</li>
+ *   <li>MINIO_ENDPOINT - MinIO service address, e.g., http://localhost:9000</li>
+ *   <li>MINIO_ACCESS_KEY - MinIO access key (default: minioadmin)</li>
+ *   <li>MINIO_SECRET_KEY - MinIO secret key (default: minioadmin)</li>
+ *   <li>MINIO_BUCKET - Test bucket name (default: lance-test-bucket)</li>
  * </ul>
  * 
- * <p>启动 MinIO 的快速方法（使用 Docker）：
+ * <p>Quick way to start MinIO (using Docker):
  * <pre>
  * docker run -p 9000:9000 -p 9001:9001 \
  *   -e "MINIO_ROOT_USER=minioadmin" \
@@ -70,13 +70,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *   minio/minio server /data --console-address ":9001"
  * </pre>
  * 
- * <p>或者使用本地安装的 MinIO 服务。
+ * <p>Or use a locally installed MinIO service.
  */
 class LanceCatalogS3Test {
 
     private static final Logger LOG = LoggerFactory.getLogger(LanceCatalogS3Test.class);
 
-    // MinIO 配置 - 从环境变量或系统属性读取
+    // MinIO configuration - read from environment variables or system properties
     private static String minioEndpoint;
     private static String minioAccessKey;
     private static String minioSecretKey;
@@ -84,7 +84,7 @@ class LanceCatalogS3Test {
     private static boolean minioAvailable = false;
 
     /**
-     * 检查 MinIO 是否可用
+     * Check if MinIO is available
      */
     static boolean isMinioAvailable() {
         return minioAvailable;
@@ -92,32 +92,32 @@ class LanceCatalogS3Test {
 
     @BeforeAll
     static void initMinioConfig() {
-        // 从环境变量读取配置
+        // Read configuration from environment variables
         minioEndpoint = getConfigValue("MINIO_ENDPOINT", "minio.endpoint", null);
         minioAccessKey = getConfigValue("MINIO_ACCESS_KEY", "minio.access.key", "minioadmin");
         minioSecretKey = getConfigValue("MINIO_SECRET_KEY", "minio.secret.key", "minioadmin");
         testBucket = getConfigValue("MINIO_BUCKET", "minio.bucket", "lance-test-bucket");
 
         if (minioEndpoint != null && !minioEndpoint.isEmpty()) {
-            LOG.info("MinIO 配置已检测到:");
+            LOG.info("MinIO configuration detected:");
             LOG.info("  Endpoint: {}", minioEndpoint);
             LOG.info("  Bucket: {}", testBucket);
             
-            // 尝试连接 MinIO 验证可用性
+            // Try to connect to MinIO to verify availability
             try {
                 minioAvailable = checkMinioConnection();
                 if (minioAvailable) {
-                    LOG.info("MinIO 连接验证成功，集成测试将被启用");
+                    LOG.info("MinIO connection verification successful, integration tests will be enabled");
                 } else {
-                    LOG.warn("MinIO 连接验证失败，集成测试将被跳过");
+                    LOG.warn("MinIO connection verification failed, integration tests will be skipped");
                 }
             } catch (Exception e) {
-                LOG.warn("MinIO 连接检查失败: {}，集成测试将被跳过", e.getMessage());
+                LOG.warn("MinIO connection check failed: {}, integration tests will be skipped", e.getMessage());
                 minioAvailable = false;
             }
         } else {
-            LOG.info("未检测到 MinIO 配置（MINIO_ENDPOINT 环境变量未设置），集成测试将被跳过");
-            LOG.info("要启用 MinIO 集成测试，请设置以下环境变量:");
+            LOG.info("No MinIO configuration detected (MINIO_ENDPOINT environment variable not set), integration tests will be skipped");
+            LOG.info("To enable MinIO integration tests, set the following environment variables:");
             LOG.info("  export MINIO_ENDPOINT=http://localhost:9000");
             LOG.info("  export MINIO_ACCESS_KEY=minioadmin");
             LOG.info("  export MINIO_SECRET_KEY=minioadmin");
@@ -126,7 +126,7 @@ class LanceCatalogS3Test {
     }
 
     /**
-     * 从环境变量或系统属性获取配置值
+     * Get configuration value from environment variable or system property
      */
     private static String getConfigValue(String envKey, String propKey, String defaultValue) {
         String value = System.getenv(envKey);
@@ -137,11 +137,11 @@ class LanceCatalogS3Test {
     }
 
     /**
-     * 检查 MinIO 连接是否可用
+     * Check if MinIO connection is available
      */
     private static boolean checkMinioConnection() {
         try {
-            // 尝试创建一个简单的 HTTP 连接来检查 MinIO 服务是否可用
+            // Try to create a simple HTTP connection to check if MinIO service is available
             java.net.URL url = new java.net.URL(minioEndpoint + "/minio/health/live");
             java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
@@ -151,68 +151,68 @@ class LanceCatalogS3Test {
             connection.disconnect();
             return responseCode == 200;
         } catch (Exception e) {
-            LOG.debug("MinIO 健康检查失败: {}", e.getMessage());
+            LOG.debug("MinIO health check failed: {}", e.getMessage());
             return false;
         }
     }
 
-    // ==================== 不需要 MinIO 的单元测试（始终运行） ====================
+    // ==================== Unit Tests That Don't Require MinIO (Always Run) ====================
 
     /**
-     * 不需要 MinIO 连接的单元测试
+     * Unit tests that don't require MinIO connection
      */
     @Nested
-    @DisplayName("单元测试 - 不需要 MinIO")
+    @DisplayName("Unit Tests - No MinIO Required")
     class UnitTests {
 
-        // ==================== 远程路径判断测试 ====================
+        // ==================== Remote Path Detection Tests ====================
 
         @Test
-        @DisplayName("测试远程路径识别 - S3 协议")
+        @DisplayName("Test remote path detection - S3 protocol")
         void testRemotePathDetectionS3() {
             LanceCatalog catalog = new LanceCatalog("test", "default", "s3://bucket/path");
             assertThat(catalog.isRemoteStorage()).isTrue();
         }
 
         @Test
-        @DisplayName("测试远程路径识别 - S3A 协议")
+        @DisplayName("Test remote path detection - S3A protocol")
         void testRemotePathDetectionS3A() {
             LanceCatalog catalog = new LanceCatalog("test", "default", "s3a://bucket/path");
             assertThat(catalog.isRemoteStorage()).isTrue();
         }
 
         @Test
-        @DisplayName("测试远程路径识别 - GCS 协议")
+        @DisplayName("Test remote path detection - GCS protocol")
         void testRemotePathDetectionGCS() {
             LanceCatalog catalog = new LanceCatalog("test", "default", "gs://bucket/path");
             assertThat(catalog.isRemoteStorage()).isTrue();
         }
 
         @Test
-        @DisplayName("测试远程路径识别 - Azure 协议")
+        @DisplayName("Test remote path detection - Azure protocol")
         void testRemotePathDetectionAzure() {
             LanceCatalog catalog = new LanceCatalog("test", "default", "az://container/path");
             assertThat(catalog.isRemoteStorage()).isTrue();
         }
 
         @Test
-        @DisplayName("测试本地路径识别")
+        @DisplayName("Test local path detection")
         void testLocalPathDetection() {
             LanceCatalog catalog = new LanceCatalog("test", "default", "/tmp/local/path");
             assertThat(catalog.isRemoteStorage()).isFalse();
         }
 
-        // ==================== 工厂测试 ====================
+        // ==================== Factory Tests ====================
 
         @Test
-        @DisplayName("测试 LanceCatalogFactory S3 配置选项")
+        @DisplayName("Test LanceCatalogFactory S3 configuration options")
         void testCatalogFactoryS3Options() {
             LanceCatalogFactory factory = new LanceCatalogFactory();
 
             Set<String> optionalOptionKeys = new HashSet<>();
             factory.optionalOptions().forEach(opt -> optionalOptionKeys.add(opt.key()));
 
-            // 验证 S3 相关选项存在
+            // Verify S3 related options exist
             assertThat(optionalOptionKeys).contains(
                     "s3-access-key",
                     "s3-secret-key",
@@ -224,32 +224,32 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试 S3 配置选项默认值")
+        @DisplayName("Test S3 configuration options default values")
         void testS3ConfigOptionsDefaults() {
             assertThat(LanceCatalogFactory.S3_VIRTUAL_HOSTED_STYLE.defaultValue()).isTrue();
             assertThat(LanceCatalogFactory.S3_ALLOW_HTTP.defaultValue()).isFalse();
         }
 
         @Test
-        @DisplayName("测试 S3 配置选项描述")
+        @DisplayName("Test S3 configuration options descriptions")
         void testS3ConfigOptionsDescriptions() {
-            // 验证配置选项存在且有描述
+            // Verify configuration options exist and have descriptions
             assertThat(LanceCatalogFactory.S3_ACCESS_KEY.key()).isEqualTo("s3-access-key");
             assertThat(LanceCatalogFactory.S3_SECRET_KEY.key()).isEqualTo("s3-secret-key");
             assertThat(LanceCatalogFactory.S3_REGION.key()).isEqualTo("s3-region");
             assertThat(LanceCatalogFactory.S3_ENDPOINT.key()).isEqualTo("s3-endpoint");
             
-            // 验证描述不为空
+            // Verify descriptions are not null
             assertThat(LanceCatalogFactory.S3_ACCESS_KEY.description()).isNotNull();
             assertThat(LanceCatalogFactory.S3_SECRET_KEY.description()).isNotNull();
             assertThat(LanceCatalogFactory.S3_REGION.description()).isNotNull();
             assertThat(LanceCatalogFactory.S3_ENDPOINT.description()).isNotNull();
         }
 
-        // ==================== 路径标准化测试 ====================
+        // ==================== Path Normalization Tests ====================
 
         @Test
-        @DisplayName("测试仓库路径标准化 - 移除末尾斜杠")
+        @DisplayName("Test warehouse path normalization - remove trailing slashes")
         void testWarehousePathNormalization() {
             LanceCatalog catalog1 = new LanceCatalog("test", "default", "s3://bucket/path/");
             assertThat(catalog1.getWarehouse()).isEqualTo("s3://bucket/path");
@@ -259,16 +259,16 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试仓库路径标准化 - 保留根路径")
+        @DisplayName("Test warehouse path normalization - preserve root path")
         void testWarehousePathNormalizationRoot() {
             LanceCatalog catalog = new LanceCatalog("test", "default", "s3://bucket");
             assertThat(catalog.getWarehouse()).isEqualTo("s3://bucket");
         }
 
-        // ==================== 边界条件测试 ====================
+        // ==================== Edge Case Tests ====================
 
         @Test
-        @DisplayName("测试空存储选项的 S3 路径")
+        @DisplayName("Test S3 path with empty storage options")
         void testS3PathWithEmptyOptions() {
             LanceCatalog catalog = new LanceCatalog(
                     "test", "default",
@@ -280,7 +280,7 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试 null 存储选项")
+        @DisplayName("Test null storage options")
         void testNullStorageOptions() {
             LanceCatalog catalog = new LanceCatalog(
                     "test", "default",
@@ -292,7 +292,7 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试存储选项不可变性")
+        @DisplayName("Test storage options immutability")
         void testStorageOptionsImmutability() {
             Map<String, String> originalOptions = new HashMap<>();
             originalOptions.put("key", "value");
@@ -302,14 +302,14 @@ class LanceCatalogS3Test {
                     "s3://bucket/path",
                     originalOptions);
 
-            // 修改原始 map 不应影响 catalog 内部的选项
+            // Modifying original map should not affect catalog internal options
             originalOptions.put("new_key", "new_value");
 
             assertThat(catalog.getStorageOptions()).doesNotContainKey("new_key");
         }
 
         @Test
-        @DisplayName("测试获取存储选项返回不可变 Map")
+        @DisplayName("Test getStorageOptions returns unmodifiable Map")
         void testGetStorageOptionsReturnsUnmodifiable() {
             Map<String, String> storageOptions = new HashMap<>();
             storageOptions.put("key", "value");
@@ -321,13 +321,13 @@ class LanceCatalogS3Test {
 
             Map<String, String> returnedOptions = catalog.getStorageOptions();
 
-            // 尝试修改返回的 map 应该抛出异常
+            // Attempting to modify returned map should throw exception
             assertThatThrownBy(() -> returnedOptions.put("new_key", "new_value"))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 基本属性（无需连接）")
+        @DisplayName("Test S3 Catalog basic properties (no connection required)")
         void testS3CatalogBasicProperties() {
             Map<String, String> storageOptions = new HashMap<>();
             storageOptions.put("aws_access_key_id", "test_key");
@@ -347,14 +347,14 @@ class LanceCatalogS3Test {
         }
     }
 
-    // ==================== 需要 MinIO 的集成测试 ====================
+    // ==================== Integration Tests That Require MinIO ====================
 
     /**
-     * 需要 MinIO 连接的集成测试
-     * 仅在设置了 MINIO_ENDPOINT 环境变量且 MinIO 服务可用时运行
+     * Integration tests that require MinIO connection.
+     * Only run when MINIO_ENDPOINT environment variable is set and MinIO service is available.
      */
     @Nested
-    @DisplayName("集成测试 - 需要 MinIO")
+    @DisplayName("Integration Tests - MinIO Required")
     @EnabledIf("org.apache.flink.connector.lance.table.LanceCatalogS3Test#isMinioAvailable")
     class MinioIntegrationTests {
 
@@ -364,11 +364,11 @@ class LanceCatalogS3Test {
 
         @BeforeEach
         void setUp() throws Exception {
-            // 为每个测试生成唯一的路径，避免测试之间的干扰
+            // Generate unique path for each test to avoid interference between tests
             testId = UUID.randomUUID().toString().substring(0, 8);
             warehousePath = String.format("s3://%s/lance-warehouse-%s", testBucket, testId);
 
-            // 创建带 S3 配置的 Catalog
+            // Create Catalog with S3 configuration
             Map<String, String> storageOptions = new HashMap<>();
             storageOptions.put("aws_access_key_id", minioAccessKey);
             storageOptions.put("aws_secret_access_key", minioSecretKey);
@@ -380,7 +380,7 @@ class LanceCatalogS3Test {
             s3Catalog = new LanceCatalog("lance_s3_catalog", "default", warehousePath, storageOptions);
             s3Catalog.open();
 
-            LOG.info("测试 Catalog 已创建，warehouse: {}", warehousePath);
+            LOG.info("Test Catalog created, warehouse: {}", warehousePath);
         }
 
         @AfterEach
@@ -390,10 +390,10 @@ class LanceCatalogS3Test {
             }
         }
 
-        // ==================== 基本属性测试 ====================
+        // ==================== Basic Properties Tests ====================
 
         @Test
-        @DisplayName("测试 S3 Catalog 基本属性")
+        @DisplayName("Test S3 Catalog basic properties")
         void testS3CatalogProperties() {
             assertThat(s3Catalog.getName()).isEqualTo("lance_s3_catalog");
             assertThat(s3Catalog.getDefaultDatabase()).isEqualTo("default");
@@ -402,7 +402,7 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试 S3 存储选项配置")
+        @DisplayName("Test S3 storage options configuration")
         void testS3StorageOptions() {
             Map<String, String> options = s3Catalog.getStorageOptions();
 
@@ -413,62 +413,62 @@ class LanceCatalogS3Test {
             assertThat(options).containsEntry("allow_http", "true");
         }
 
-        // ==================== 数据库操作测试 ====================
+        // ==================== Database Operation Tests ====================
 
         @Test
-        @DisplayName("测试 S3 Catalog 默认数据库存在")
+        @DisplayName("Test S3 Catalog default database exists")
         void testDefaultDatabaseExists() throws Exception {
             assertThat(s3Catalog.databaseExists("default")).isTrue();
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 列举数据库")
+        @DisplayName("Test S3 Catalog list databases")
         void testListDatabases() throws Exception {
             List<String> databases = s3Catalog.listDatabases();
             assertThat(databases).contains("default");
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 创建数据库")
+        @DisplayName("Test S3 Catalog create database")
         void testCreateDatabase() throws Exception {
             String dbName = "test_s3_db_" + testId;
 
-            // 创建数据库
+            // Create database
             s3Catalog.createDatabase(dbName, null, false);
 
-            // 验证数据库存在
+            // Verify database exists
             assertThat(s3Catalog.databaseExists(dbName)).isTrue();
 
-            // 验证数据库在列表中
+            // Verify database in list
             List<String> databases = s3Catalog.listDatabases();
             assertThat(databases).contains(dbName);
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 创建已存在数据库（ignoreIfExists=false）")
+        @DisplayName("Test S3 Catalog create existing database (ignoreIfExists=false)")
         void testCreateExistingDatabaseWithoutIgnore() throws Exception {
             String dbName = "existing_db_" + testId;
             s3Catalog.createDatabase(dbName, null, false);
 
-            // 再次创建应该抛出异常
+            // Creating again should throw exception
             assertThatThrownBy(() -> s3Catalog.createDatabase(dbName, null, false))
                     .isInstanceOf(DatabaseAlreadyExistException.class);
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 创建已存在数据库（ignoreIfExists=true）")
+        @DisplayName("Test S3 Catalog create existing database (ignoreIfExists=true)")
         void testCreateExistingDatabaseWithIgnore() throws Exception {
             String dbName = "existing_db_2_" + testId;
             s3Catalog.createDatabase(dbName, null, false);
 
-            // 再次创建应该不抛出异常
+            // Creating again should not throw exception
             s3Catalog.createDatabase(dbName, null, true);
 
             assertThat(s3Catalog.databaseExists(dbName)).isTrue();
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 获取数据库")
+        @DisplayName("Test S3 Catalog get database")
         void testGetDatabase() throws Exception {
             String dbName = "get_db_test_" + testId;
             s3Catalog.createDatabase(dbName, null, false);
@@ -479,45 +479,45 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 获取不存在的数据库")
+        @DisplayName("Test S3 Catalog get non-existing database")
         void testGetNonExistingDatabase() {
             assertThatThrownBy(() -> s3Catalog.getDatabase("non_existing_db_" + testId))
                     .isInstanceOf(DatabaseNotExistException.class);
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 删除数据库")
+        @DisplayName("Test S3 Catalog drop database")
         void testDropDatabase() throws Exception {
             String dbName = "drop_db_test_" + testId;
             s3Catalog.createDatabase(dbName, null, false);
             assertThat(s3Catalog.databaseExists(dbName)).isTrue();
 
-            // 删除数据库
+            // Drop database
             s3Catalog.dropDatabase(dbName, false, false);
 
-            // 验证数据库不在列表中
+            // Verify database not in list
             List<String> databases = s3Catalog.listDatabases();
             assertThat(databases).doesNotContain(dbName);
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 删除不存在数据库（ignoreIfNotExists=false）")
+        @DisplayName("Test S3 Catalog drop non-existing database (ignoreIfNotExists=false)")
         void testDropNonExistingDatabaseWithoutIgnore() {
             assertThatThrownBy(() -> s3Catalog.dropDatabase("non_existing_drop_db_" + testId, false, false))
                     .isInstanceOf(DatabaseNotExistException.class);
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 删除不存在数据库（ignoreIfNotExists=true）")
+        @DisplayName("Test S3 Catalog drop non-existing database (ignoreIfNotExists=true)")
         void testDropNonExistingDatabaseWithIgnore() throws Exception {
-            // 不应该抛出异常
+            // Should not throw exception
             s3Catalog.dropDatabase("non_existing_drop_db_2_" + testId, true, false);
         }
 
-        // ==================== 表操作测试 ====================
+        // ==================== Table Operation Tests ====================
 
         @Test
-        @DisplayName("测试 S3 Catalog 列举表（空数据库）")
+        @DisplayName("Test S3 Catalog list tables (empty database)")
         void testListTablesEmpty() throws Exception {
             String dbName = "empty_tables_db_" + testId;
             s3Catalog.createDatabase(dbName, null, false);
@@ -527,7 +527,7 @@ class LanceCatalogS3Test {
         }
 
         @Test
-        @DisplayName("测试 S3 Catalog 表不存在")
+        @DisplayName("Test S3 Catalog table not exists")
         void testTableNotExists() throws Exception {
             String dbName = "table_check_db_" + testId;
             s3Catalog.createDatabase(dbName, null, false);
@@ -536,10 +536,10 @@ class LanceCatalogS3Test {
                     .isFalse();
         }
 
-        // ==================== SQL DDL 创建 Catalog 测试 ====================
+        // ==================== SQL DDL Create Catalog Tests ====================
 
         @Test
-        @DisplayName("测试通过 SQL DDL 创建 S3 Catalog")
+        @DisplayName("Test creating S3 Catalog via SQL DDL")
         void testCreateS3CatalogViaSql() throws Exception {
             EnvironmentSettings settings = EnvironmentSettings.newInstance()
                     .inBatchMode()
@@ -548,7 +548,7 @@ class LanceCatalogS3Test {
 
             String catalogName = "lance_s3_sql_" + testId;
 
-            // 使用 SQL 创建 S3 Catalog
+            // Create S3 Catalog using SQL
             String createCatalogSql = String.format(
                     "CREATE CATALOG %s WITH (" +
                             "'type' = 'lance', " +
@@ -565,20 +565,20 @@ class LanceCatalogS3Test {
 
             tableEnv.executeSql(createCatalogSql);
 
-            // 验证 Catalog 已创建
+            // Verify Catalog was created
             String[] catalogs = tableEnv.listCatalogs();
             assertThat(catalogs).contains(catalogName);
 
-            // 使用 Catalog
+            // Use Catalog
             tableEnv.useCatalog(catalogName);
             assertThat(tableEnv.getCurrentCatalog()).isEqualTo(catalogName);
 
-            // 验证默认数据库
+            // Verify default database
             assertThat(tableEnv.getCurrentDatabase()).isEqualTo("default");
         }
 
         @Test
-        @DisplayName("测试通过 SQL DDL 在 S3 Catalog 中创建数据库")
+        @DisplayName("Test creating database in S3 Catalog via SQL DDL")
         void testCreateDatabaseViaSql() throws Exception {
             EnvironmentSettings settings = EnvironmentSettings.newInstance()
                     .inBatchMode()
@@ -587,7 +587,7 @@ class LanceCatalogS3Test {
 
             String catalogName = "lance_s3_db_sql_" + testId;
 
-            // 创建 S3 Catalog
+            // Create S3 Catalog
             String createCatalogSql = String.format(
                     "CREATE CATALOG %s WITH (" +
                             "'type' = 'lance', " +
@@ -604,19 +604,19 @@ class LanceCatalogS3Test {
             tableEnv.executeSql(createCatalogSql);
             tableEnv.useCatalog(catalogName);
 
-            // 创建数据库
+            // Create database
             String dbName = "test_database_" + testId;
             tableEnv.executeSql("CREATE DATABASE IF NOT EXISTS " + dbName);
 
-            // 验证数据库已创建
+            // Verify database was created
             String[] databases = tableEnv.listDatabases();
             assertThat(databases).contains(dbName);
         }
 
-        // ==================== 多 Catalog 测试 ====================
+        // ==================== Multiple Catalog Tests ====================
 
         @Test
-        @DisplayName("测试多个 S3 Catalog 实例")
+        @DisplayName("Test multiple S3 Catalog instances")
         void testMultipleS3Catalogs() throws Exception {
             Map<String, String> storageOptions = new HashMap<>();
             storageOptions.put("aws_access_key_id", minioAccessKey);
@@ -625,14 +625,14 @@ class LanceCatalogS3Test {
             storageOptions.put("aws_endpoint", minioEndpoint);
             storageOptions.put("allow_http", "true");
 
-            // 创建第一个 Catalog
+            // Create first Catalog
             LanceCatalog catalog1 = new LanceCatalog(
                     "catalog1", "default",
                     "s3://" + testBucket + "/warehouse1_" + testId,
                     storageOptions);
             catalog1.open();
 
-            // 创建第二个 Catalog
+            // Create second Catalog
             LanceCatalog catalog2 = new LanceCatalog(
                     "catalog2", "default",
                     "s3://" + testBucket + "/warehouse2_" + testId,
@@ -640,7 +640,7 @@ class LanceCatalogS3Test {
             catalog2.open();
 
             try {
-                // 验证两个 Catalog 独立工作
+                // Verify two Catalogs work independently
                 assertThat(catalog1.getWarehouse()).isNotEqualTo(catalog2.getWarehouse());
 
                 String db1 = "db1_" + testId;

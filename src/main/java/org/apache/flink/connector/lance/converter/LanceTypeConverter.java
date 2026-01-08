@@ -51,9 +51,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Lance/Arrow 类型与 Flink 类型之间的转换器。
+ * Type converter between Lance/Arrow and Flink types.
  * 
- * <p>支持的类型映射：
+ * <p>Supported type mappings:
  * <ul>
  *   <li>Int8 <-> TINYINT</li>
  *   <li>Int16 <-> SMALLINT</li>
@@ -76,7 +76,7 @@ public class LanceTypeConverter implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(LanceTypeConverter.class);
 
     /**
-     * 将 Arrow Schema 转换为 Flink RowType
+     * Convert Arrow Schema to Flink RowType
      *
      * @param schema Arrow Schema
      * @return Flink RowType
@@ -91,7 +91,7 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 将 Flink RowType 转换为 Arrow Schema
+     * Convert Flink RowType to Arrow Schema
      *
      * @param rowType Flink RowType
      * @return Arrow Schema
@@ -106,7 +106,7 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 将 Arrow Field 转换为 Flink LogicalType
+     * Convert Arrow Field to Flink LogicalType
      *
      * @param field Arrow Field
      * @return Flink LogicalType
@@ -128,7 +128,7 @@ public class LanceTypeConverter implements Serializable {
                 case 64:
                     return new BigIntType(nullable);
                 default:
-                    throw new UnsupportedTypeException("不支持的 Arrow Int 位宽: " + bitWidth);
+                    throw new UnsupportedTypeException("Unsupported Arrow Int bit width: " + bitWidth);
             }
         } else if (arrowType instanceof ArrowType.FloatingPoint) {
             ArrowType.FloatingPoint fpType = (ArrowType.FloatingPoint) arrowType;
@@ -139,7 +139,7 @@ public class LanceTypeConverter implements Serializable {
                 case DOUBLE:
                     return new DoubleType(nullable);
                 default:
-                    throw new UnsupportedTypeException("不支持的 Arrow 浮点精度: " + precision);
+                    throw new UnsupportedTypeException("Unsupported Arrow floating point precision: " + precision);
             }
         } else if (arrowType instanceof ArrowType.Utf8 || arrowType instanceof ArrowType.LargeUtf8) {
             return new VarCharType(nullable, VarCharType.MAX_LENGTH);
@@ -156,28 +156,28 @@ public class LanceTypeConverter implements Serializable {
             return new DateType(nullable);
         } else if (arrowType instanceof ArrowType.Timestamp) {
             ArrowType.Timestamp tsType = (ArrowType.Timestamp) arrowType;
-            // 根据时间单位确定精度
+            // Determine precision based on time unit
             int precision = getTimestampPrecision(tsType.getUnit());
             return new TimestampType(nullable, precision);
         } else if (arrowType instanceof ArrowType.FixedSizeList) {
-            // 向量类型：FixedSizeList<Float32/Float64>
+            // Vector type: FixedSizeList<Float32/Float64>
             ArrowType.FixedSizeList listType = (ArrowType.FixedSizeList) arrowType;
             List<Field> children = field.getChildren();
             if (children != null && !children.isEmpty()) {
                 LogicalType elementType = arrowTypeToFlinkType(children.get(0));
                 return new ArrayType(nullable, elementType);
             }
-            throw new UnsupportedTypeException("FixedSizeList 必须包含子类型");
+            throw new UnsupportedTypeException("FixedSizeList must contain child type");
         } else if (arrowType instanceof ArrowType.List || arrowType instanceof ArrowType.LargeList) {
-            // 普通列表类型
+            // Regular list type
             List<Field> children = field.getChildren();
             if (children != null && !children.isEmpty()) {
                 LogicalType elementType = arrowTypeToFlinkType(children.get(0));
                 return new ArrayType(nullable, elementType);
             }
-            throw new UnsupportedTypeException("List 必须包含子类型");
+            throw new UnsupportedTypeException("List must contain child type");
         } else if (arrowType instanceof ArrowType.Struct) {
-            // 结构体类型
+            // Struct type
             List<RowType.RowField> structFields = new ArrayList<>();
             for (Field child : field.getChildren()) {
                 LogicalType childType = arrowTypeToFlinkType(child);
@@ -185,18 +185,18 @@ public class LanceTypeConverter implements Serializable {
             }
             return new RowType(nullable, structFields);
         } else if (arrowType instanceof ArrowType.Null) {
-            // Null 类型，映射为可空的字符串
-            LOG.warn("Arrow Null 类型映射为可空的 STRING 类型");
+            // Null type, map to nullable string
+            LOG.warn("Arrow Null type mapped to nullable STRING type");
             return new VarCharType(true, VarCharType.MAX_LENGTH);
         }
 
-        throw new UnsupportedTypeException("不支持的 Arrow 类型: " + arrowType.getClass().getSimpleName());
+        throw new UnsupportedTypeException("Unsupported Arrow type: " + arrowType.getClass().getSimpleName());
     }
 
     /**
-     * 将 Flink LogicalType 转换为 Arrow Field
+     * Convert Flink LogicalType to Arrow Field
      *
-     * @param name 字段名
+     * @param name Field name
      * @param logicalType Flink LogicalType
      * @return Arrow Field
      */
@@ -238,7 +238,7 @@ public class LanceTypeConverter implements Serializable {
             Field childField = flinkTypeToArrowField("item", elementType);
             children = new ArrayList<>();
             children.add(childField);
-            // 对于向量类型，使用 List 类型
+            // For vector types, use List type
             arrowType = ArrowType.List.INSTANCE;
         } else if (logicalType instanceof RowType) {
             RowType rowType = (RowType) logicalType;
@@ -249,7 +249,7 @@ public class LanceTypeConverter implements Serializable {
             }
             arrowType = ArrowType.Struct.INSTANCE;
         } else {
-            throw new UnsupportedTypeException("不支持的 Flink 类型: " + logicalType.getClass().getSimpleName());
+            throw new UnsupportedTypeException("Unsupported Flink type: " + logicalType.getClass().getSimpleName());
         }
 
         FieldType fieldType = new FieldType(nullable, arrowType, null);
@@ -257,11 +257,11 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 创建向量字段（FixedSizeList<Float32>）
+     * Create vector field (FixedSizeList<Float32>)
      *
-     * @param name 字段名
-     * @param dimension 向量维度
-     * @param nullable 是否可空
+     * @param name Field name
+     * @param dimension Vector dimension
+     * @param nullable Whether nullable
      * @return Arrow Field
      */
     public static Field createVectorField(String name, int dimension, boolean nullable) {
@@ -276,11 +276,11 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 创建 Float64 向量字段（FixedSizeList<Float64>）
+     * Create Float64 vector field (FixedSizeList<Float64>)
      *
-     * @param name 字段名
-     * @param dimension 向量维度
-     * @param nullable 是否可空
+     * @param name Field name
+     * @param dimension Vector dimension
+     * @param nullable Whether nullable
      * @return Arrow Field
      */
     public static Field createFloat64VectorField(String name, int dimension, boolean nullable) {
@@ -295,10 +295,10 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 检查字段是否为向量类型（FixedSizeList<Float32/Float64>）
+     * Check if field is vector type (FixedSizeList<Float32/Float64>)
      *
      * @param field Arrow Field
-     * @return 是否为向量类型
+     * @return Whether vector type
      */
     public static boolean isVectorField(Field field) {
         ArrowType arrowType = field.getType();
@@ -321,10 +321,10 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 获取向量字段的维度
+     * Get vector field dimension
      *
      * @param field Arrow Field
-     * @return 向量维度，如果不是向量字段返回 -1
+     * @return Vector dimension, returns -1 if not vector field
      */
     public static int getVectorDimension(Field field) {
         ArrowType arrowType = field.getType();
@@ -335,7 +335,7 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 将 Flink DataType 转换为 LogicalType
+     * Convert Flink DataType to LogicalType
      *
      * @param dataType Flink DataType
      * @return LogicalType
@@ -345,7 +345,7 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 将 LogicalType 转换为 Flink DataType
+     * Convert LogicalType to Flink DataType
      *
      * @param logicalType Flink LogicalType
      * @return Flink DataType
@@ -389,11 +389,11 @@ public class LanceTypeConverter implements Serializable {
             return DataTypes.ROW(fields);
         }
         
-        throw new UnsupportedTypeException("不支持的 LogicalType: " + logicalType.getClass().getSimpleName());
+        throw new UnsupportedTypeException("Unsupported LogicalType: " + logicalType.getClass().getSimpleName());
     }
 
     /**
-     * 根据 Arrow TimeUnit 获取 Flink Timestamp 精度
+     * Get Flink Timestamp precision based on Arrow TimeUnit
      */
     private static int getTimestampPrecision(TimeUnit timeUnit) {
         switch (timeUnit) {
@@ -406,12 +406,12 @@ public class LanceTypeConverter implements Serializable {
             case NANOSECOND:
                 return 9;
             default:
-                return 6; // 默认微秒精度
+                return 6; // Default microsecond precision
         }
     }
 
     /**
-     * 根据 Flink Timestamp 精度获取 Arrow TimeUnit
+     * Get Arrow TimeUnit based on Flink Timestamp precision
      */
     private static TimeUnit getArrowTimeUnit(int precision) {
         if (precision <= 0) {
@@ -426,7 +426,7 @@ public class LanceTypeConverter implements Serializable {
     }
 
     /**
-     * 不支持的类型异常
+     * Unsupported type exception
      */
     public static class UnsupportedTypeException extends RuntimeException {
         public UnsupportedTypeException(String message) {

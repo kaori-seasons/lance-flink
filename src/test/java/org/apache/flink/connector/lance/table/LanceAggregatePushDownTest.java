@@ -40,9 +40,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * LanceDynamicTableSource 聚合下推测试
+ * LanceDynamicTableSource aggregate push-down tests
  */
-@DisplayName("LanceDynamicTableSource 聚合下推测试")
+@DisplayName("LanceDynamicTableSource Aggregate Push-Down Tests")
 class LanceAggregatePushDownTest {
 
     private LanceOptions options;
@@ -55,7 +55,7 @@ class LanceAggregatePushDownTest {
                 .readBatchSize(1024)
                 .build();
 
-        // 创建测试用的物理数据类型
+        // Create test physical data type
         // Schema: (id INT, name VARCHAR, category VARCHAR, amount DOUBLE, quantity INT)
         RowType rowType = new RowType(Arrays.asList(
                 new RowType.RowField("id", new IntType()),
@@ -67,17 +67,17 @@ class LanceAggregatePushDownTest {
         physicalDataType = TypeConversions.fromLogicalToDataType(rowType);
     }
 
-    // ==================== 聚合下推接口实现测试 ====================
+    // ==================== Aggregate Push-Down Interface Tests ====================
 
     @Nested
-    @DisplayName("applyAggregates 方法测试")
+    @DisplayName("applyAggregates Method Tests")
     class ApplyAggregatesTests {
 
-        // 注意：由于 applyAggregates 需要真实的 AggregateExpression 对象，
-        // 这里我们主要测试聚合信息的存储和状态管理
+        // Note: Since applyAggregates requires real AggregateExpression objects,
+        // we mainly test aggregate info storage and state management here
 
         @Test
-        @DisplayName("初始状态应该没有聚合下推")
+        @DisplayName("Initial state should have no aggregate push-down")
         void testInitialState() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(options, physicalDataType);
             
@@ -86,21 +86,21 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("copy 应该正确复制聚合状态")
+        @DisplayName("copy should correctly copy aggregate state")
         void testCopyAggregateState() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(options, physicalDataType);
             
-            // 复制源
+            // Copy source
             LanceDynamicTableSource copied = (LanceDynamicTableSource) source.copy();
             
-            // 验证复制后的状态
+            // Verify copied state
             assertFalse(copied.isAggregatePushDownAccepted());
             assertNull(copied.getAggregateInfo());
             assertNotSame(source, copied);
         }
 
         @Test
-        @DisplayName("asSummaryString 应该返回正确的摘要")
+        @DisplayName("asSummaryString should return correct summary")
         void testAsSummaryString() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(options, physicalDataType);
             
@@ -110,14 +110,14 @@ class LanceAggregatePushDownTest {
         }
     }
 
-    // ==================== AggregateInfo 集成测试 ====================
+    // ==================== AggregateInfo Integration Tests ====================
 
     @Nested
-    @DisplayName("AggregateInfo 集成测试")
+    @DisplayName("AggregateInfo Integration Tests")
     class AggregateInfoIntegrationTests {
 
         @Test
-        @DisplayName("简单 COUNT(*) 聚合信息构建")
+        @DisplayName("Simple COUNT(*) aggregate info build")
         void testSimpleCountStarAggregateInfo() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -129,13 +129,13 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("带 GROUP BY 的聚合信息构建")
+        @DisplayName("Aggregate info build with GROUP BY")
         void testGroupByAggregateInfo() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "total_amount")
                     .addAvg("amount", "avg_amount")
                     .groupBy("category")
-                    .groupByFieldIndices(new int[]{2})  // category 在索引 2
+                    .groupByFieldIndices(new int[]{2})  // category at index 2
                     .build();
             
             assertFalse(aggInfo.isSimpleCountStar());
@@ -145,7 +145,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("多聚合函数信息构建")
+        @DisplayName("Multiple aggregates info build")
         void testMultipleAggregatesInfo() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -157,7 +157,7 @@ class LanceAggregatePushDownTest {
             
             assertEquals(5, aggInfo.getAggregateCalls().size());
             
-            // 验证各聚合函数类型
+            // Verify each aggregate function type
             List<AggregateInfo.AggregateCall> calls = aggInfo.getAggregateCalls();
             assertEquals(AggregateInfo.AggregateFunction.COUNT, calls.get(0).getFunction());
             assertEquals(AggregateInfo.AggregateFunction.SUM, calls.get(1).getFunction());
@@ -167,7 +167,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("getRequiredColumns 应该返回正确的列")
+        @DisplayName("getRequiredColumns should return correct columns")
         void testGetRequiredColumns() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "sum_amount")
@@ -183,56 +183,56 @@ class LanceAggregatePushDownTest {
         }
     }
 
-    // ==================== 组合功能测试 ====================
+    // ==================== Combined Functionality Tests ====================
 
     @Nested
-    @DisplayName("组合功能测试")
+    @DisplayName("Combined Functionality Tests")
     class CombinedFunctionalityTests {
 
         @Test
-        @DisplayName("聚合下推与过滤下推组合")
+        @DisplayName("Aggregate push-down with filter push-down combination")
         void testAggregatePushDownWithFilter() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(options, physicalDataType);
             
-            // 模拟添加过滤条件（通过内部 filters 列表）
-            // 注意：实际的过滤下推通过 applyFilters 方法完成
+            // Simulate adding filter conditions (through internal filters list)
+            // Note: Actual filter push-down is done through applyFilters method
             
-            // 验证源可以同时支持过滤和聚合下推
+            // Verify source can support both filter and aggregate push-down
             assertNotNull(source.getOptions());
         }
 
         @Test
-        @DisplayName("聚合下推与列裁剪组合")
+        @DisplayName("Aggregate push-down with column pruning combination")
         void testAggregatePushDownWithProjection() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(options, physicalDataType);
             
-            // 应用列裁剪
+            // Apply column pruning
             source.applyProjection(new int[][]{{0}, {3}, {4}});  // id, amount, quantity
             
-            // 验证源仍然可以正常工作
+            // Verify source still works correctly
             assertNotNull(source.getOptions());
         }
 
         @Test
-        @DisplayName("聚合下推与 Limit 组合")
+        @DisplayName("Aggregate push-down with Limit combination")
         void testAggregatePushDownWithLimit() {
             LanceDynamicTableSource source = new LanceDynamicTableSource(options, physicalDataType);
             
-            // 应用 Limit
+            // Apply Limit
             source.applyLimit(100);
             
             assertEquals(Long.valueOf(100), source.getLimit());
         }
     }
 
-    // ==================== 边界情况测试 ====================
+    // ==================== Edge Case Tests ====================
 
     @Nested
-    @DisplayName("边界情况测试")
+    @DisplayName("Edge Case Tests")
     class EdgeCaseTests {
 
         @Test
-        @DisplayName("多个分组列应该正确处理")
+        @DisplayName("Multiple group by columns should be handled correctly")
         void testMultipleGroupByColumns() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -245,7 +245,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("同一列的多个聚合应该正确处理")
+        @DisplayName("Multiple aggregates on same column should be handled correctly")
         void testMultipleAggregatesOnSameColumn() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "sum_amount")
@@ -257,14 +257,14 @@ class LanceAggregatePushDownTest {
             
             assertEquals(5, aggInfo.getAggregateCalls().size());
             
-            // 验证 getRequiredColumns 只包含一次 amount
+            // Verify getRequiredColumns contains amount only once
             List<String> required = aggInfo.getRequiredColumns();
             long amountCount = required.stream().filter(c -> c.equals("amount")).count();
             assertEquals(1, amountCount);
         }
 
         @Test
-        @DisplayName("空分组集应该正确处理")
+        @DisplayName("Empty group by set should be handled correctly")
         void testEmptyGroupBy() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -276,14 +276,14 @@ class LanceAggregatePushDownTest {
         }
     }
 
-    // ==================== 聚合函数支持测试 ====================
+    // ==================== Aggregate Function Support Tests ====================
 
     @Nested
-    @DisplayName("聚合函数支持测试")
+    @DisplayName("Aggregate Function Support Tests")
     class AggregateFunctionSupportTests {
 
         @Test
-        @DisplayName("COUNT 函数应该支持")
+        @DisplayName("COUNT function should be supported")
         void testCountSupport() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addCountStar("cnt")
@@ -295,7 +295,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("SUM 函数应该支持")
+        @DisplayName("SUM function should be supported")
         void testSumSupport() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addSum("amount", "sum_amount")
@@ -307,7 +307,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("AVG 函数应该支持")
+        @DisplayName("AVG function should be supported")
         void testAvgSupport() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addAvg("amount", "avg_amount")
@@ -319,7 +319,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("MIN 函数应该支持")
+        @DisplayName("MIN function should be supported")
         void testMinSupport() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addMin("amount", "min_amount")
@@ -331,7 +331,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("MAX 函数应该支持")
+        @DisplayName("MAX function should be supported")
         void testMaxSupport() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addMax("amount", "max_amount")
@@ -343,7 +343,7 @@ class LanceAggregatePushDownTest {
         }
 
         @Test
-        @DisplayName("COUNT DISTINCT 函数应该支持")
+        @DisplayName("COUNT DISTINCT function should be supported")
         void testCountDistinctSupport() {
             AggregateInfo aggInfo = AggregateInfo.builder()
                     .addAggregateCall(AggregateInfo.AggregateFunction.COUNT_DISTINCT, "category", "distinct_cnt")

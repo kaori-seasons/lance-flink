@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * LanceVectorSearch 单元测试。
+ * LanceVectorSearch unit tests.
  */
 class LanceVectorSearchTest {
 
@@ -47,7 +47,7 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试向量检索配置构建")
+    @DisplayName("Test vector search configuration build")
     void testVectorSearchConfiguration() {
         LanceVectorSearch search = LanceVectorSearch.builder()
                 .datasetPath(datasetPath)
@@ -62,9 +62,9 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试不同距离度量类型")
+    @DisplayName("Test different metric types")
     void testDifferentMetricTypes() {
-        // L2 距离
+        // L2 distance
         LanceVectorSearch l2Search = LanceVectorSearch.builder()
                 .datasetPath(datasetPath)
                 .columnName("embedding")
@@ -72,7 +72,7 @@ class LanceVectorSearchTest {
                 .build();
         assertThat(l2Search).isNotNull();
 
-        // Cosine 相似度
+        // Cosine similarity
         LanceVectorSearch cosineSearch = LanceVectorSearch.builder()
                 .datasetPath(datasetPath)
                 .columnName("embedding")
@@ -80,7 +80,7 @@ class LanceVectorSearchTest {
                 .build();
         assertThat(cosineSearch).isNotNull();
 
-        // Dot 点积
+        // Dot product
         LanceVectorSearch dotSearch = LanceVectorSearch.builder()
                 .datasetPath(datasetPath)
                 .columnName("embedding")
@@ -90,29 +90,29 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试缺少数据集路径时抛出异常")
+    @DisplayName("Test exception when missing dataset path")
     void testMissingDatasetPath() {
         assertThatThrownBy(() -> LanceVectorSearch.builder()
                 .columnName("embedding")
                 .metricType(MetricType.L2)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("数据集路径不能为空");
+                .hasMessageContaining("Dataset path cannot be empty");
     }
 
     @Test
-    @DisplayName("测试缺少列名时抛出异常")
+    @DisplayName("Test exception when missing column name")
     void testMissingColumnName() {
         assertThatThrownBy(() -> LanceVectorSearch.builder()
                 .datasetPath(datasetPath)
                 .metricType(MetricType.L2)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("列名不能为空");
+                .hasMessageContaining("Column name cannot be empty");
     }
 
     @Test
-    @DisplayName("测试无效的 nprobes 值")
+    @DisplayName("Test invalid nprobes value")
     void testInvalidNprobes() {
         assertThatThrownBy(() -> LanceVectorSearch.builder()
                 .datasetPath(datasetPath)
@@ -120,18 +120,18 @@ class LanceVectorSearchTest {
                 .nprobes(0)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("nprobes 必须大于 0");
+                .hasMessageContaining("nprobes must be greater than 0");
     }
 
     @Test
-    @DisplayName("测试默认向量检索配置值")
+    @DisplayName("Test default vector search configuration values")
     void testDefaultVectorSearchConfiguration() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
                 .vectorColumn("embedding")
                 .build();
 
-        // 验证默认值
+        // Verify default values
         assertThat(options.getVectorMetric()).isEqualTo(MetricType.L2);
         assertThat(options.getVectorNprobes()).isEqualTo(20);
         assertThat(options.getVectorEf()).isEqualTo(100);
@@ -139,7 +139,7 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试从 LanceOptions 创建向量检索器")
+    @DisplayName("Test creating vector searcher from LanceOptions")
     void testFromOptions() {
         LanceOptions options = LanceOptions.builder()
                 .path(datasetPath)
@@ -156,9 +156,9 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试检索结果")
+    @DisplayName("Test search result")
     void testSearchResult() {
-        // 创建模拟的 RowData
+        // Create mock RowData
         LanceVectorSearch.SearchResult result = new LanceVectorSearch.SearchResult(null, 0.5);
 
         assertThat(result.getDistance()).isEqualTo(0.5);
@@ -167,23 +167,23 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试检索结果相似度计算")
+    @DisplayName("Test search result similarity calculation")
     void testSearchResultSimilarity() {
-        // 距离为 0 时，相似度应为 1.0
+        // Distance 0 should have similarity 1.0
         LanceVectorSearch.SearchResult perfectMatch = new LanceVectorSearch.SearchResult(null, 0.0);
         assertThat(perfectMatch.getSimilarity()).isEqualTo(1.0);
 
-        // 距离为 1 时，相似度应为 0.5
+        // Distance 1 should have similarity 0.5
         LanceVectorSearch.SearchResult halfMatch = new LanceVectorSearch.SearchResult(null, 1.0);
         assertThat(halfMatch.getSimilarity()).isEqualTo(0.5);
 
-        // 距离越大，相似度越小
+        // Greater distance means lower similarity
         LanceVectorSearch.SearchResult farResult = new LanceVectorSearch.SearchResult(null, 10.0);
         assertThat(farResult.getSimilarity()).isLessThan(0.5);
     }
 
     @Test
-    @DisplayName("测试检索结果相等性")
+    @DisplayName("Test search result equality")
     void testSearchResultEquality() {
         LanceVectorSearch.SearchResult result1 = new LanceVectorSearch.SearchResult(null, 0.5);
         LanceVectorSearch.SearchResult result2 = new LanceVectorSearch.SearchResult(null, 0.5);
@@ -195,7 +195,7 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试配置校验 - 无效的向量检索参数")
+    @DisplayName("Test configuration validation - invalid vector search params")
     void testInvalidVectorSearchParams() {
         assertThatThrownBy(() -> LanceOptions.builder()
                 .path(datasetPath)
@@ -223,7 +223,7 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试距离度量类型值")
+    @DisplayName("Test metric type values")
     void testMetricTypeValues() {
         assertThat(MetricType.L2.getValue()).isEqualTo("L2");
         assertThat(MetricType.COSINE.getValue()).isEqualTo("Cosine");
@@ -231,7 +231,7 @@ class LanceVectorSearchTest {
     }
 
     @Test
-    @DisplayName("测试检索结果 toString")
+    @DisplayName("Test search result toString")
     void testSearchResultToString() {
         LanceVectorSearch.SearchResult result = new LanceVectorSearch.SearchResult(null, 0.5);
         String str = result.toString();

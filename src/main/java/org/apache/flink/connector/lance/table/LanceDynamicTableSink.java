@@ -33,9 +33,9 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 /**
- * Lance 动态表数据汇。
+ * Lance dynamic table sink.
  * 
- * <p>实现 DynamicTableSink 接口，支持将 Flink 数据写入 Lance 数据集。
+ * <p>Implements DynamicTableSink interface, supports writing Flink data to Lance dataset.
  */
 public class LanceDynamicTableSink implements DynamicTableSink {
 
@@ -49,7 +49,7 @@ public class LanceDynamicTableSink implements DynamicTableSink {
 
     @Override
     public ChangelogMode getChangelogMode(ChangelogMode requestedMode) {
-        // Lance 只支持 INSERT 操作
+        // Lance only supports INSERT operations
         return ChangelogMode.newBuilder()
                 .addContainedKind(RowKind.INSERT)
                 .build();
@@ -59,7 +59,7 @@ public class LanceDynamicTableSink implements DynamicTableSink {
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
         RowType rowType = (RowType) physicalDataType.getLogicalType();
 
-        // 创建 LanceSink
+        // Create LanceSink
         LanceSink lanceSink = new LanceSink(options, rowType);
 
         return SinkFunctionProvider.of(lanceSink);
@@ -76,14 +76,14 @@ public class LanceDynamicTableSink implements DynamicTableSink {
     }
 
     /**
-     * 获取配置选项
+     * Get configuration options
      */
     public LanceOptions getOptions() {
         return options;
     }
 
     /**
-     * 获取物理数据类型
+     * Get physical data type
      */
     public DataType getPhysicalDataType() {
         return physicalDataType;
